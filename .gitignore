@@ -1,7 +1,18 @@
+# Secrets
 .env
+**/.env
+**/.env.local
+
+# Python (talkse)
 __pycache__/
 *.pyc
 .venv/
 venv/
 turns/
 *.wav
+
+# Node (flowcrm)
+node_modules/
+.next/
+dist/
+*.tsbuildinfo

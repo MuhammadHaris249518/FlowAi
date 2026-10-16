@@ -1,0 +1,137 @@
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+
+// A relative base ("/api/v1") means the API is served from the same origin: in the
+// combined container, Next.js rewrites /api/v1/* to the API process (next.config.mjs).
+function apiUrl(path: string): URL {
+  return API_BASE_URL.startsWith("http")
+    ? new URL(`${API_BASE_URL}${path}`)
+    : new URL(`${API_BASE_URL}${path}`, window.location.origin);
+}
+
+export class ApiError extends Error {
+  constructor(public code: string, message: string, public status: number) {
+    super(message);
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
+interface ApiEnvelope<T> {
+  success: boolean;
+  data?: T;
+  error?: { code: string; message: string };
+}
+
+async function parseEnvelope<T>(res: Response): Promise<T> {
+  // DELETE returns 204 with no body — nothing to parse.
+  if (res.status === 204) return undefined as T;
+
+  const body: ApiEnvelope<T> = await res.json();
+
+  if (!res.ok || !body.success) {
+    throw new ApiError(
+      body.error?.code ?? "UNKNOWN_ERROR",
+      body.error?.message ?? "Something went wrong. Please try again.",
+      res.status
+    );
+  }
+
+  return body.data as T;
+}
+
+export interface RequestContext {
+  getToken: () => Promise<string | null>;
+  organizationId?: string | null;
+}
+
+// For endpoints that return a raw file (CSV, etc.) instead of the JSON
+// envelope — triggers an actual browser download rather than parsing JSON.
+export async function downloadFile(
+  path: string,
+  ctx: RequestContext,
+  params: Record<string, string> | undefined,
+  filename: string
+): Promise<void> {
+  const url = apiUrl(path);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
+
+  const token = await ctx.getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (ctx.organizationId) headers["X-Organization-Id"] = ctx.organizationId;
+
+  const res = await fetch(url.toString(), { headers, credentials: "include" });
+  if (!res.ok) {
+    throw new ApiError("EXPORT_FAILED", "Couldn't download the file. Please try again.", res.status);
+  }
+
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+}
+
+async function request<T>(
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  path: string,
+  ctx: RequestContext,
+  options?: { params?: Record<string, string>; body?: unknown }
+): Promise<T> {
+  const url = apiUrl(path);
+  if (options?.params) {
+    Object.entries(options.params).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
+
+  const token = await ctx.getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (ctx.organizationId) headers["X-Organization-Id"] = ctx.organizationId;
+
+  const res = await fetch(url.toString(), {
+    method,
+    headers,
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+    credentials: "include",
+  });
+
+  return parseEnvelope<T>(res);
+}
+
+async function requestFormData<T>(
+  path: string,
+  ctx: RequestContext,
+  formData: FormData
+): Promise<T> {
+  const url = apiUrl(path);
+  const token = await ctx.getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (ctx.organizationId) headers["X-Organization-Id"] = ctx.organizationId;
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers,
+    body: formData,
+    credentials: "include",
+  });
+
+  return parseEnvelope<T>(res);
+}
+
+export const apiClient = {
+  get: <T>(path: string, ctx: RequestContext, params?: Record<string, string>) =>
+    request<T>("GET", path, ctx, { params }),
+  post: <T>(path: string, ctx: RequestContext, body?: unknown) =>
+    request<T>("POST", path, ctx, { body }),
+  postFormData: <T>(path: string, ctx: RequestContext, formData: FormData) =>
+    requestFormData<T>(path, ctx, formData),
+  patch: <T>(path: string, ctx: RequestContext, body?: unknown) =>
+    request<T>("PATCH", path, ctx, { body }),
+  delete: <T>(path: string, ctx: RequestContext) => request<T>("DELETE", path, ctx),
+};
