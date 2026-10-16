@@ -1,0 +1,569 @@
+{
+  "metadata": {
+    "purpose": "100% FICTIONAL dummy data for testing the Voice AI Receptionist RAG/vector-store pipeline. Do NOT use as real clinic information.",
+    "dataset_version": "1.0.0",
+    "generated_for": "Talkse Voice AI Platform - dev/testing only",
+    "last_updated": "2026-07-23",
+    "notes": [
+      "Phone numbers use the 555-01XX range, which is reserved by NANPA for fictional use and will never be assigned to a real subscriber.",
+      "'clinic' and 'providers' hold structured facts (hours, prices, policies) — in production these belong in Postgres and should be read by the Business Logic Layer, not retrieved via vector search, so the LLM can't misquote a price.",
+      "'faq' is the part actually worth embedding into a vector store — it's semantically fuzzy, high-variance phrasing from callers maps well to it.",
+      "'embedding_text' fields are pre-flattened, self-contained strings (no pronouns, no 'see above') ready to hand to an embedding model as-is."
+    ]
+  },
+
+  "clinic": {
+    "id": "clinic_test_001",
+    "name": "Bloom Aesthetics & Wellness Medspa",
+    "tagline": "Modern skin, injectables, and body treatments in the heart of Austin",
+    "phone": "+1-512-555-0142",
+    "after_hours_emergency_line": "+1-512-555-0199",
+    "email": "hello@bloomaestheticstx.test",
+    "website": "https://www.bloomaestheticstx.test",
+    "address": {
+      "line1": "4521 Barton Springs Rd, Suite 200",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78704",
+      "country": "US"
+    },
+    "timezone": "America/Chicago",
+    "hours": {
+      "monday":    { "open": "09:00", "close": "18:00" },
+      "tuesday":   { "open": "09:00", "close": "18:00" },
+      "wednesday": { "open": "09:00", "close": "18:00" },
+      "thursday":  { "open": "09:00", "close": "19:00" },
+      "friday":    { "open": "09:00", "close": "18:00" },
+      "saturday":  { "open": "10:00", "close": "16:00" },
+      "sunday":    { "closed": true }
+    },
+    "holidays_closed": [
+      "New Year's Day",
+      "Memorial Day",
+      "July 4th (Independence Day)",
+      "Labor Day",
+      "Thanksgiving Day",
+      "Day After Thanksgiving",
+      "Christmas Eve (closes at 1:00 PM)",
+      "Christmas Day"
+    ],
+    "parking": "Free surface lot behind the building, plus free 2-hour street parking on Barton Springs Rd.",
+    "accepted_payment_methods": [
+      "Visa", "Mastercard", "American Express", "Discover",
+      "HSA/FSA card", "Apple Pay", "Google Pay", "Cash",
+      "Cherry financing", "CareCredit financing"
+    ],
+    "insurance_note": "Cosmetic treatments are not covered by insurance and are self-pay. Medical Botox for chronic migraines or hyperhidrosis (excessive sweating) may be billable through insurance with prior authorization — callers asking about this should be routed to the billing coordinator, not quoted a price on the call.",
+    "walk_in_policy": "Walk-ins are welcome for skincare product purchases and brief 10-minute skin consultations, subject to provider availability. Injectable, laser, and body-contouring treatments require a scheduled appointment.",
+    "minimum_age_policy": "18+ for all injectables, laser treatments, and body contouring. 16+ for facials and general skincare treatments, with a parent or guardian present and a signed consent form.",
+    "cancellation_policy": {
+      "notice_required_hours": 24,
+      "late_cancel_or_no_show_fee_usd": 50,
+      "notes": "Fee is charged to the card on file. After a third no-show, prepayment is required to book future appointments."
+    },
+    "deposit_policy": {
+      "applies_to_services_priced_over_usd": 200,
+      "deposit_amount_usd": 50,
+      "notes": "Deposit is applied toward the final bill. It is forfeited if the appointment is canceled or rescheduled with less than 24 hours' notice."
+    },
+    "new_patient_policy": "First-time Botox/filler patients require a complimentary 20-minute consultation with a provider before treatment; this can often be done same-day if the schedule allows. Returning patients may book treatment directly without a separate consultation visit."
+  },
+
+  "providers": [
+    {
+      "id": "prov_001",
+      "name": "Dr. Emily Carter, MD",
+      "title": "Medical Director & Injector",
+      "specialties": ["Botox / neuromodulators", "dermal fillers", "medical-grade skincare"],
+      "years_experience": 12,
+      "working_days": ["Monday", "Wednesday", "Friday"],
+      "accepts_new_patients": true,
+      "embedding_text": "Dr. Emily Carter, MD is the Medical Director and lead injector at Bloom Aesthetics & Wellness Medspa in Austin, TX. She has 12 years of experience and specializes in Botox and neuromodulator injections, dermal fillers, and medical-grade skincare. She works Monday, Wednesday, and Friday and is accepting new patients."
+    },
+    {
+      "id": "prov_002",
+      "name": "Dr. Aaron Patel, MD",
+      "title": "Laser & Body Contouring Specialist",
+      "specialties": ["laser hair removal", "IPL photofacial", "CoolSculpting"],
+      "years_experience": 9,
+      "working_days": ["Tuesday", "Thursday", "Saturday"],
+      "accepts_new_patients": true,
+      "embedding_text": "Dr. Aaron Patel, MD is the Laser and Body Contouring Specialist at Bloom Aesthetics & Wellness Medspa in Austin, TX. He has 9 years of experience and specializes in laser hair removal, IPL photofacial treatments, and CoolSculpting body contouring. He works Tuesday, Thursday, and Saturday and is accepting new patients."
+    },
+    {
+      "id": "prov_003",
+      "name": "Sarah Nguyen, NP-C",
+      "title": "Nurse Injector",
+      "specialties": ["Botox touch-ups", "dermal filler touch-ups", "Sculptra"],
+      "years_experience": 6,
+      "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      "accepts_new_patients": true,
+      "embedding_text": "Sarah Nguyen, NP-C is a Nurse Injector at Bloom Aesthetics & Wellness Medspa in Austin, TX. She has 6 years of experience and specializes in Botox touch-ups, dermal filler touch-ups, and Sculptra collagen biostimulator treatments. She works Monday through Friday and is accepting new patients."
+    },
+    {
+      "id": "prov_004",
+      "name": "Rachel Lopez, LE",
+      "title": "Licensed Esthetician",
+      "specialties": ["HydraFacial", "chemical peels", "microneedling", "dermaplaning"],
+      "years_experience": 7,
+      "working_days": ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      "accepts_new_patients": true,
+      "embedding_text": "Rachel Lopez, LE is a Licensed Esthetician at Bloom Aesthetics & Wellness Medspa in Austin, TX. She has 7 years of experience and specializes in HydraFacial treatments, chemical peels, microneedling, and dermaplaning. She works Tuesday through Saturday and is accepting new patients."
+    },
+    {
+      "id": "prov_005",
+      "name": "Monica Reyes, LE",
+      "title": "Licensed Esthetician",
+      "specialties": ["facials", "LED light therapy", "waxing"],
+      "years_experience": 4,
+      "working_days": ["Wednesday", "Thursday", "Friday", "Saturday"],
+      "accepts_new_patients": true,
+      "embedding_text": "Monica Reyes, LE is a Licensed Esthetician at Bloom Aesthetics & Wellness Medspa in Austin, TX. She has 4 years of experience and specializes in facials, LED light therapy, and waxing. She works Wednesday through Saturday and is accepting new patients."
+    }
+  ],
+
+  "services": [
+    {
+      "id": "svc_consult",
+      "name": "New Patient Consultation",
+      "category": "consultation",
+      "description": "A 20-minute in-person consultation with a provider to discuss goals, medical history, and a treatment plan before a first injectable treatment.",
+      "duration_minutes": 20,
+      "price_usd": 0,
+      "price_unit": "flat",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_001", "prov_002", "prov_003", "prov_004", "prov_005"],
+      "prep_instructions": "No special prep required. Bring a photo ID and a list of current medications/supplements.",
+      "contraindications": [],
+      "embedding_text": "New Patient Consultation at Bloom Aesthetics is a free, 20-minute appointment with any provider to discuss treatment goals and medical history before a first injectable treatment. No prep is required beyond bringing a photo ID and current medication list."
+    },
+    {
+      "id": "svc_botox_touchup",
+      "name": "Botox / Neuromodulator Touch-Up",
+      "category": "injectable",
+      "description": "A small-unit touch-up appointment for existing Botox/Dysport patients, typically 5-15 units.",
+      "duration_minutes": 15,
+      "price_usd": 12,
+      "price_unit": "per_unit",
+      "requires_prior_consultation": true,
+      "provider_ids": ["prov_001", "prov_003"],
+      "prep_instructions": "Avoid alcohol and blood-thinning medications (aspirin, ibuprofen, fish oil) for 24 hours before treatment to reduce bruising risk.",
+      "aftercare_instructions": "Stay upright and avoid lying down for 4 hours. Avoid strenuous exercise, saunas, and facial massage for 24 hours. Avoid touching/rubbing the treated area.",
+      "contraindications": ["pregnancy", "breastfeeding", "active skin infection at injection site"],
+      "embedding_text": "Botox / Neuromodulator Touch-Up at Bloom Aesthetics costs $12 per unit, typically 5 to 15 units, and takes about 15 minutes. Performed by Dr. Emily Carter or Sarah Nguyen, NP-C. Requires a prior consultation for first-time patients. Patients should avoid alcohol and blood thinners for 24 hours before, and avoid lying down, exercise, and touching the area for the rest of the day after. Not performed on pregnant or breastfeeding patients."
+    },
+    {
+      "id": "svc_botox_full",
+      "name": "Botox / Neuromodulator Full Treatment",
+      "category": "injectable",
+      "description": "A full neuromodulator treatment addressing multiple areas (forehead, glabella, crow's feet), averaging 20-40 units.",
+      "duration_minutes": 30,
+      "price_usd": 12,
+      "price_unit": "per_unit",
+      "requires_prior_consultation": true,
+      "provider_ids": ["prov_001", "prov_003"],
+      "prep_instructions": "Avoid alcohol and blood-thinning medications for 24 hours before treatment.",
+      "aftercare_instructions": "Stay upright for 4 hours, avoid strenuous exercise and facial massage for 24 hours.",
+      "contraindications": ["pregnancy", "breastfeeding", "active skin infection at injection site", "certain neuromuscular disorders"],
+      "embedding_text": "Botox / Neuromodulator Full Treatment at Bloom Aesthetics addresses multiple facial areas like the forehead, glabella, and crow's feet, averaging 20 to 40 units at $12 per unit, and takes about 30 minutes. Performed by Dr. Emily Carter or Sarah Nguyen, NP-C. First-time patients need a prior consultation. Not performed on pregnant or breastfeeding patients."
+    },
+    {
+      "id": "svc_filler_lips",
+      "name": "Dermal Filler - Lips",
+      "category": "injectable",
+      "description": "Hyaluronic acid filler injected into the lips for volume and shape, one syringe per session.",
+      "duration_minutes": 45,
+      "price_usd": 650,
+      "price_unit": "per_syringe",
+      "requires_prior_consultation": true,
+      "provider_ids": ["prov_001"],
+      "prep_instructions": "Avoid alcohol and blood thinners for 24-48 hours before treatment. Avoid scheduling close to major events due to expected swelling.",
+      "aftercare_instructions": "Ice the area intermittently for the first 24 hours. Avoid extreme heat, strenuous exercise, and alcohol for 24 hours. Swelling and mild bruising are normal for 3-5 days.",
+      "contraindications": ["pregnancy", "breastfeeding", "active cold sore/herpes outbreak", "known allergy to hyaluronic acid fillers"],
+      "embedding_text": "Dermal Filler for Lips at Bloom Aesthetics is a hyaluronic acid filler priced at $650 per syringe, taking about 45 minutes, performed by Dr. Emily Carter. Requires a prior consultation for first-time patients. Swelling and mild bruising are normal for 3 to 5 days afterward. Not performed on pregnant patients, breastfeeding patients, or during an active cold sore outbreak."
+    },
+    {
+      "id": "svc_filler_cheeks",
+      "name": "Dermal Filler - Cheeks / Midface",
+      "category": "injectable",
+      "description": "Hyaluronic acid filler for cheek and midface volume restoration, one syringe per session.",
+      "duration_minutes": 45,
+      "price_usd": 800,
+      "price_unit": "per_syringe",
+      "requires_prior_consultation": true,
+      "provider_ids": ["prov_001"],
+      "prep_instructions": "Avoid alcohol and blood thinners for 24-48 hours before treatment.",
+      "aftercare_instructions": "Ice intermittently for the first 24 hours. Avoid extreme heat and strenuous exercise for 24 hours.",
+      "contraindications": ["pregnancy", "breastfeeding", "known allergy to hyaluronic acid fillers"],
+      "embedding_text": "Dermal Filler for Cheeks / Midface at Bloom Aesthetics costs $800 per syringe, takes about 45 minutes, and is performed by Dr. Emily Carter. First-time patients need a prior consultation. Not performed on pregnant or breastfeeding patients."
+    },
+    {
+      "id": "svc_sculptra",
+      "name": "Sculptra (Collagen Biostimulator)",
+      "category": "injectable",
+      "description": "A biostimulatory injectable that gradually rebuilds collagen over several weeks, typically requiring a series of sessions.",
+      "duration_minutes": 45,
+      "price_usd": 900,
+      "price_unit": "per_vial",
+      "requires_prior_consultation": true,
+      "provider_ids": ["prov_003"],
+      "prep_instructions": "Avoid blood thinners for 24-48 hours before treatment.",
+      "aftercare_instructions": "Massage the treated area 5 times a day for 5 days following the 'rule of 5s' as instructed by the provider.",
+      "contraindications": ["pregnancy", "breastfeeding", "keloid scarring history"],
+      "embedding_text": "Sculptra collagen biostimulator treatment at Bloom Aesthetics costs $900 per vial, takes about 45 minutes, and is performed by Sarah Nguyen, NP-C. Results build gradually over several weeks and typically require a series of sessions. Patients are asked to massage the treated area 5 times a day for 5 days afterward."
+    },
+    {
+      "id": "svc_laser_small",
+      "name": "Laser Hair Removal - Small Area",
+      "category": "laser",
+      "description": "Laser hair removal for small areas such as underarms or upper lip. Package pricing available.",
+      "duration_minutes": 20,
+      "price_usd": 99,
+      "price_unit": "per_session",
+      "package_price_usd": 499,
+      "package_sessions": 6,
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_002"],
+      "prep_instructions": "Shave the area 24 hours before the appointment. Avoid sun exposure and tanning for 2 weeks before treatment.",
+      "aftercare_instructions": "Avoid sun exposure and use SPF 30+ on the treated area for 2 weeks. Avoid hot showers, saunas, and exfoliating for 48 hours.",
+      "contraindications": ["pregnancy", "recent sun tan/sunburn on treatment area", "isotretinoin/Accutane use in the last 6 months"],
+      "embedding_text": "Laser Hair Removal for a small area (underarms or upper lip) at Bloom Aesthetics costs $99 per session, or $499 for a package of 6 sessions, and takes about 20 minutes. Performed by Dr. Aaron Patel. Patients should shave the area 24 hours before and avoid sun exposure for 2 weeks before and after."
+    },
+    {
+      "id": "svc_laser_large",
+      "name": "Laser Hair Removal - Large Area",
+      "category": "laser",
+      "description": "Laser hair removal for large areas such as legs, back, or full arms. Package pricing available.",
+      "duration_minutes": 45,
+      "price_usd": 249,
+      "price_unit": "per_session",
+      "package_price_usd": 1299,
+      "package_sessions": 6,
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_002"],
+      "prep_instructions": "Shave the area 24 hours before the appointment. Avoid sun exposure and tanning for 2 weeks before treatment.",
+      "aftercare_instructions": "Avoid sun exposure and use SPF 30+ on the treated area for 2 weeks. Avoid hot showers and exfoliating for 48 hours.",
+      "contraindications": ["pregnancy", "recent sun tan/sunburn on treatment area", "isotretinoin/Accutane use in the last 6 months"],
+      "embedding_text": "Laser Hair Removal for a large area (legs, back, or full arms) at Bloom Aesthetics costs $249 per session, or $1,299 for a package of 6 sessions, and takes about 45 minutes. Performed by Dr. Aaron Patel. Patients should shave the area 24 hours before and avoid sun exposure for 2 weeks before and after."
+    },
+    {
+      "id": "svc_ipl",
+      "name": "IPL Photofacial",
+      "category": "laser",
+      "description": "Intense pulsed light treatment to reduce sun damage, redness, and pigmentation.",
+      "duration_minutes": 30,
+      "price_usd": 300,
+      "price_unit": "per_session",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_002"],
+      "prep_instructions": "Avoid sun exposure and self-tanner for 2 weeks before treatment.",
+      "aftercare_instructions": "Expect darkening of pigmented spots for 5-7 days before they flake off. Use SPF 30+ daily and avoid direct sun for 2 weeks.",
+      "contraindications": ["pregnancy", "recent sun tan/sunburn", "active use of photosensitizing medication"],
+      "embedding_text": "IPL Photofacial at Bloom Aesthetics costs $300 per session and takes about 30 minutes, performed by Dr. Aaron Patel. It targets sun damage, redness, and pigmentation. Treated spots typically darken and flake off over 5 to 7 days after treatment."
+    },
+    {
+      "id": "svc_coolsculpting",
+      "name": "CoolSculpting (Body Contouring)",
+      "category": "body",
+      "description": "Non-invasive fat-freezing body contouring treatment, priced per treatment area.",
+      "duration_minutes": 60,
+      "price_usd": 750,
+      "price_unit": "per_area",
+      "requires_prior_consultation": true,
+      "provider_ids": ["prov_002"],
+      "prep_instructions": "No special prep required. Wear comfortable clothing.",
+      "aftercare_instructions": "Mild numbness, redness, and swelling in the treated area are normal for 1-2 weeks. Results typically appear gradually over 1-3 months.",
+      "contraindications": ["pregnancy", "cryoglobulinemia", "cold urticaria"],
+      "embedding_text": "CoolSculpting body contouring at Bloom Aesthetics costs $750 per treatment area and takes about 60 minutes, performed by Dr. Aaron Patel. Results appear gradually over 1 to 3 months. Requires a prior consultation."
+    },
+    {
+      "id": "svc_hydrafacial",
+      "name": "HydraFacial",
+      "category": "facial",
+      "description": "A multi-step facial combining cleansing, exfoliation, extraction, and hydration using patented HydraFacial technology.",
+      "duration_minutes": 50,
+      "price_usd": 199,
+      "price_unit": "per_session",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_004"],
+      "prep_instructions": "No special prep required. Arrive with a clean face if possible.",
+      "aftercare_instructions": "Skin may appear slightly flushed for a few hours. Avoid heavy makeup for the rest of the day. Use SPF the next day.",
+      "contraindications": ["active skin infection", "recent sunburn"],
+      "embedding_text": "HydraFacial at Bloom Aesthetics costs $199 per session and takes about 50 minutes, performed by Rachel Lopez, LE. It combines cleansing, exfoliation, extraction, and hydration. No downtime, though skin may look flushed for a few hours afterward."
+    },
+    {
+      "id": "svc_peel",
+      "name": "Chemical Peel (Medium-Depth)",
+      "category": "facial",
+      "description": "A medium-depth chemical peel to improve tone, texture, and mild pigmentation.",
+      "duration_minutes": 30,
+      "price_usd": 150,
+      "price_unit": "per_session",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_004"],
+      "prep_instructions": "Discontinue retinoids 3-5 days before treatment. Avoid sun exposure for 1 week before.",
+      "aftercare_instructions": "Expect visible peeling/flaking for 3-5 days. Avoid sun exposure, sweating, and picking at peeling skin. Use SPF 30+ daily.",
+      "contraindications": ["pregnancy", "breastfeeding", "isotretinoin/Accutane use in the last 6 months", "active cold sore outbreak"],
+      "embedding_text": "Chemical Peel (medium-depth) at Bloom Aesthetics costs $150 and takes about 30 minutes, performed by Rachel Lopez, LE. Visible peeling and flaking is expected for 3 to 5 days afterward. Not performed on pregnant or breastfeeding patients, or those who used Accutane in the last 6 months."
+    },
+    {
+      "id": "svc_microneedling",
+      "name": "Microneedling",
+      "category": "facial",
+      "description": "Collagen induction therapy using fine needles to stimulate skin repair, often combined with PRP or serums.",
+      "duration_minutes": 45,
+      "price_usd": 350,
+      "price_unit": "per_session",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_004"],
+      "prep_instructions": "Discontinue retinoids 3-5 days before treatment. Avoid blood thinners for 24 hours before.",
+      "aftercare_instructions": "Skin will appear red for 24-48 hours, similar to a mild sunburn. Avoid makeup for 24 hours and avoid sun exposure for 1 week.",
+      "contraindications": ["pregnancy", "active acne breakouts", "isotretinoin/Accutane use in the last 6 months", "keloid scarring history"],
+      "embedding_text": "Microneedling at Bloom Aesthetics costs $350 and takes about 45 minutes, performed by Rachel Lopez, LE. Skin appears red for 24 to 48 hours afterward, similar to a mild sunburn. Not performed on patients with active acne breakouts or recent Accutane use."
+    },
+    {
+      "id": "svc_dermaplaning",
+      "name": "Dermaplaning",
+      "category": "facial",
+      "description": "Manual exfoliation treatment that removes dead skin cells and peach fuzz using a surgical blade.",
+      "duration_minutes": 30,
+      "price_usd": 85,
+      "price_unit": "per_session",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_004"],
+      "prep_instructions": "No special prep required.",
+      "aftercare_instructions": "Use SPF 30+ daily for 1 week following treatment. Avoid harsh exfoliants for 3-5 days.",
+      "contraindications": ["active acne breakouts", "active skin infection"],
+      "embedding_text": "Dermaplaning at Bloom Aesthetics costs $85 and takes about 30 minutes, performed by Rachel Lopez, LE. It's a manual exfoliation treatment with no real downtime, though patients should use SPF daily for a week afterward."
+    },
+    {
+      "id": "svc_led_addon",
+      "name": "LED Light Therapy (Add-On)",
+      "category": "facial_addon",
+      "description": "LED light therapy add-on to reduce inflammation and support skin healing, typically added to another facial service.",
+      "duration_minutes": 15,
+      "price_usd": 40,
+      "price_unit": "per_session",
+      "requires_prior_consultation": false,
+      "provider_ids": ["prov_004", "prov_005"],
+      "prep_instructions": "None.",
+      "aftercare_instructions": "None beyond the primary service it was added to.",
+      "contraindications": ["photosensitivity disorders"],
+      "embedding_text": "LED Light Therapy add-on at Bloom Aesthetics costs $40 for 15 minutes and is typically added on to another facial service. Performed by Rachel Lopez or Monica Reyes."
+    }
+  ],
+
+  "membership_program": {
+    "name": "Bloom Glow Club",
+    "monthly_fee_usd": 99,
+    "benefits": [
+      "One HydraFacial or equivalent facial credit per month",
+      "10% off all injectable treatments",
+      "15% off retail skincare products",
+      "Priority booking access"
+    ],
+    "cancellation_terms": "Month-to-month, cancel anytime with 30 days' notice.",
+    "embedding_text": "The Bloom Glow Club membership at Bloom Aesthetics costs $99 per month and includes one HydraFacial or equivalent facial credit per month, 10% off injectables, 15% off retail skincare products, and priority booking. It's a month-to-month membership that can be canceled with 30 days' notice."
+  },
+
+  "promotions": [
+    {
+      "id": "promo_001",
+      "name": "New Patient Special",
+      "description": "$50 off a first Botox or dermal filler treatment for new patients.",
+      "valid_until": "2026-12-31",
+      "embedding_text": "Bloom Aesthetics is currently running a New Patient Special: $50 off a first Botox or dermal filler treatment for new patients, valid through December 31, 2026."
+    },
+    {
+      "id": "promo_002",
+      "name": "Summer Laser Package",
+      "description": "Buy 4 laser hair removal sessions on any area, get 2 sessions free.",
+      "valid_until": "2026-09-01",
+      "embedding_text": "Bloom Aesthetics is currently running a Summer Laser Package promotion: buy 4 laser hair removal sessions on any area and get 2 sessions free, valid through September 1, 2026."
+    }
+  ],
+
+  "faq": [
+    {
+      "id": "faq_001",
+      "category": "hours",
+      "question": "What are your business hours?",
+      "answer": "Bloom Aesthetics is open Monday, Tuesday, Wednesday, and Friday from 9:00 AM to 6:00 PM, Thursday from 9:00 AM to 7:00 PM, and Saturday from 10:00 AM to 4:00 PM. We're closed on Sundays.",
+      "keywords": ["hours", "open", "close", "schedule", "when open"]
+    },
+    {
+      "id": "faq_002",
+      "category": "hours",
+      "question": "Are you open on Sundays?",
+      "answer": "No, we're closed on Sundays. Our latest weekday closing is 7:00 PM on Thursdays, and we're open Saturdays from 10:00 AM to 4:00 PM.",
+      "keywords": ["sunday", "closed", "weekend", "hours"]
+    },
+    {
+      "id": "faq_003",
+      "category": "booking",
+      "question": "Do you accept walk-in appointments?",
+      "answer": "We accept walk-ins for skincare product purchases and brief skin consultations, depending on provider availability. Injectable, laser, and body-contouring treatments require a scheduled appointment.",
+      "keywords": ["walk-in", "walk in", "no appointment", "same day"]
+    },
+    {
+      "id": "faq_004",
+      "category": "booking",
+      "question": "Do I need a consultation before getting Botox or filler?",
+      "answer": "Yes, first-time Botox and filler patients need a complimentary 20-minute consultation with a provider before treatment. This can often be scheduled the same day if there's availability. Returning patients can book treatment directly.",
+      "keywords": ["consultation", "first time", "new patient", "botox", "filler"]
+    },
+    {
+      "id": "faq_005",
+      "category": "policy",
+      "question": "What is your cancellation policy?",
+      "answer": "We require at least 24 hours' notice to cancel or reschedule an appointment. Canceling with less than 24 hours' notice, or not showing up, results in a $50 fee charged to the card on file.",
+      "keywords": ["cancel", "cancellation", "reschedule", "no-show", "fee"]
+    },
+    {
+      "id": "faq_006",
+      "category": "policy",
+      "question": "Do you require a deposit to book an appointment?",
+      "answer": "For services priced at $200 or more, we require a $50 deposit to hold the appointment. It's applied toward your final bill, but it's forfeited if you cancel or reschedule with less than 24 hours' notice.",
+      "keywords": ["deposit", "hold appointment", "prepay"]
+    },
+    {
+      "id": "faq_007",
+      "category": "payment",
+      "question": "What payment methods do you accept?",
+      "answer": "We accept Visa, Mastercard, American Express, Discover, HSA/FSA cards, Apple Pay, Google Pay, and cash. We also offer financing through Cherry and CareCredit.",
+      "keywords": ["payment", "pay", "credit card", "financing", "hsa", "fsa"]
+    },
+    {
+      "id": "faq_008",
+      "category": "payment",
+      "question": "Do you accept insurance?",
+      "answer": "Cosmetic treatments are self-pay and not covered by insurance. If you're asking about medical Botox for chronic migraines or excessive sweating, that may be billable through insurance with prior authorization — I can have our billing coordinator follow up with you on that.",
+      "keywords": ["insurance", "covered", "medical botox", "migraines"]
+    },
+    {
+      "id": "faq_009",
+      "category": "payment",
+      "question": "Do you offer financing or payment plans?",
+      "answer": "Yes, we offer financing through both Cherry and CareCredit, which let you split treatment costs into monthly payments.",
+      "keywords": ["financing", "payment plan", "cherry", "carecredit", "installments"]
+    },
+    {
+      "id": "faq_010",
+      "category": "treatment_botox",
+      "question": "Does Botox hurt?",
+      "answer": "Most patients describe Botox injections as a brief pinch or sting that lasts only a second or two per injection point. Numbing cream can be applied beforehand if you're sensitive to needles — just let us know when booking.",
+      "keywords": ["botox", "pain", "hurt", "needle", "numbing"]
+    },
+    {
+      "id": "faq_011",
+      "category": "treatment_botox",
+      "question": "How long does Botox last?",
+      "answer": "Botox typically lasts 3 to 4 months before a touch-up or full treatment is needed again. Results can vary based on individual metabolism and the treated area.",
+      "keywords": ["botox", "how long", "last", "duration"]
+    },
+    {
+      "id": "faq_012",
+      "category": "treatment_botox",
+      "question": "How soon will I see Botox results?",
+      "answer": "You'll typically start seeing results within 3 to 5 days, with full results visible at around 2 weeks after treatment.",
+      "keywords": ["botox", "results", "how soon", "when see results"]
+    },
+    {
+      "id": "faq_013",
+      "category": "treatment_filler",
+      "question": "What is the difference between Botox and dermal filler?",
+      "answer": "Botox relaxes muscles to soften dynamic wrinkles like forehead lines and crow's feet. Dermal filler adds volume to areas like lips or cheeks using hyaluronic acid gel. They're often used together depending on your goals.",
+      "keywords": ["botox vs filler", "difference", "neuromodulator", "hyaluronic acid"]
+    },
+    {
+      "id": "faq_014",
+      "category": "treatment_filler",
+      "question": "How long do lip fillers last?",
+      "answer": "Lip filler typically lasts 6 to 12 months, depending on the product used and individual metabolism.",
+      "keywords": ["lip filler", "how long", "last", "duration"]
+    },
+    {
+      "id": "faq_015",
+      "category": "treatment_laser",
+      "question": "Is laser hair removal permanent?",
+      "answer": "Laser hair removal provides long-term hair reduction rather than 100% permanent removal. Most clients see significant, lasting reduction after a full package of sessions, with occasional touch-ups over time.",
+      "keywords": ["laser hair removal", "permanent", "results"]
+    },
+    {
+      "id": "faq_016",
+      "category": "treatment_laser",
+      "question": "How many laser hair removal sessions do I need?",
+      "answer": "Most clients need about 6 sessions spaced 4 to 6 weeks apart for optimal results, since hair grows in different cycles. That's why we offer a 6-session package at a discounted rate.",
+      "keywords": ["laser hair removal", "how many sessions", "package"]
+    },
+    {
+      "id": "faq_017",
+      "category": "treatment_general",
+      "question": "What should I avoid before my appointment?",
+      "answer": "For most injectable, laser, and peel treatments, avoid alcohol and blood-thinning medications like aspirin, ibuprofen, and fish oil for 24 to 48 hours beforehand, and avoid sun exposure or tanning for 1 to 2 weeks before laser or peel treatments. Specific prep varies by service, so we'll confirm details when you book.",
+      "keywords": ["before appointment", "prep", "avoid", "prepare"]
+    },
+    {
+      "id": "faq_018",
+      "category": "treatment_general",
+      "question": "What should I avoid after treatment?",
+      "answer": "Aftercare varies by treatment, but generally you should avoid strenuous exercise, direct sun exposure, and touching or rubbing the treated area for the first 24 to 48 hours. Your provider will give you specific written aftercare instructions after your appointment.",
+      "keywords": ["after appointment", "aftercare", "avoid", "recovery"]
+    },
+    {
+      "id": "faq_019",
+      "category": "eligibility",
+      "question": "Is there a minimum age requirement?",
+      "answer": "You must be 18 or older for injectables, laser treatments, and body contouring. For facials and general skincare treatments, we accept clients 16 and older with a parent or guardian present and a signed consent form.",
+      "keywords": ["age", "minimum age", "minor", "18", "16"]
+    },
+    {
+      "id": "faq_020",
+      "category": "eligibility",
+      "question": "Can I get treatment while pregnant or breastfeeding?",
+      "answer": "For safety, we don't perform Botox, dermal filler, laser treatments, chemical peels, microneedling, or CoolSculpting on patients who are pregnant or breastfeeding. Some facials, like HydraFacial, may be modified — we'd recommend discussing this with a provider first.",
+      "keywords": ["pregnant", "pregnancy", "breastfeeding", "safe"]
+    },
+    {
+      "id": "faq_021",
+      "category": "general",
+      "question": "Is there parking available?",
+      "answer": "Yes, there's a free parking lot behind our building, plus free 2-hour street parking available on Barton Springs Rd.",
+      "keywords": ["parking", "park"]
+    },
+    {
+      "id": "faq_022",
+      "category": "general",
+      "question": "Can I bring a friend or family member with me?",
+      "answer": "Absolutely, you're welcome to bring a guest to wait in our lobby. For treatment rooms, only the patient (and a parent/guardian for minors) is typically allowed inside during the procedure.",
+      "keywords": ["bring someone", "guest", "friend", "family"]
+    },
+    {
+      "id": "faq_023",
+      "category": "general",
+      "question": "Do you treat men as well as women?",
+      "answer": "Yes, we welcome clients of all genders. About a quarter of our injectable and laser clients are men.",
+      "keywords": ["men", "male", "gender"]
+    },
+    {
+      "id": "faq_024",
+      "category": "general",
+      "question": "What forms of identification do I need to bring?",
+      "answer": "Please bring a valid government-issued photo ID, such as a driver's license or passport, to your first appointment.",
+      "keywords": ["id", "identification", "driver's license", "documents"]
+    },
+    {
+      "id": "faq_025",
+      "category": "emergency",
+      "question": "What should I do if I have an allergic reaction after treatment?",
+      "answer": "If you experience difficulty breathing, severe swelling, or chest pain, call 911 immediately. For urgent but non-life-threatening concerns after hours, call our emergency line and a provider will return your call within 2 hours during business days.",
+      "keywords": ["allergic reaction", "emergency", "swelling", "urgent", "side effect"]
+    }
+  ],
+
+  "emergency_protocol": {
+    "life_threatening_instructions": "If experiencing a medical emergency (difficulty breathing, severe swelling, chest pain), instruct the caller to call 911 immediately. This should always override normal call flow and never wait on booking logic.",
+    "after_hours_non_emergency_line": "+1-512-555-0199",
+    "response_time_sla": "Provider callback within 2 hours during business days for urgent, non-life-threatening concerns left on the after-hours line."
+  }
+}
