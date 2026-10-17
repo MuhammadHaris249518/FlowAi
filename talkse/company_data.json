@@ -28,6 +28,7 @@
     "currency": "USD",
     "owner": {
       "name": "Haris",
+      "full_name": "Muhammad Haris",
       "title": "Owner"
     },
     "hours": {

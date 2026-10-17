@@ -123,6 +123,7 @@ def info() -> dict:
         "tagline": clinic.get("tagline", ""),
         "owner": clinic_config.OWNER_NAME,
         "owner_title": clinic.get("owner", {}).get("title", "Owner"),
+        "owner_full_name": clinic.get("owner", {}).get("full_name") or clinic_config.OWNER_NAME,
         "phone": clinic.get("phone"),
         "emergency_line": clinic.get("after_hours_emergency_line"),
         "city": ", ".join(p for p in (address.get("city"), address.get("state")) if p),

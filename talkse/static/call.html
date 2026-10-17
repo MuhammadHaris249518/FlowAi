@@ -5,183 +5,263 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Receptionist · Talkse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #070b14; --bg2: #0d1424; --panel: rgba(255,255,255,0.045); --panel-border: rgba(255,255,255,0.09);
-    --text: #e8edf7; --muted: #8b97ad; --faint: #5d6880;
-    --accent: #4f8cff; --accent2: #22d3ee; --good: #34d399; --warn: #fbbf24; --danger: #f87171;
-    --caller: rgba(79,140,255,0.16); --ai: rgba(255,255,255,0.06);
+    --bg: #f6f9fc; --card: #ffffff; --line: #e6edf5; --line2: #eef3f8;
+    --text: #0f2440; --muted: #64748b; --faint: #94a3b8;
+    --teal: #14b8a6; --teal-d: #0d9488; --teal-soft: rgba(20,184,166,0.12);
+    --blue: #3b82f6; --violet: #8b5cf6; --good: #10b981; --warn: #f59e0b; --danger: #ef4444;
+    --navy: #13315c;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; }
   body {
     min-height: 100vh; color: var(--text); background: var(--bg);
-    background-image:
-      radial-gradient(900px 600px at 50% -10%, rgba(79,140,255,0.18), transparent 60%),
-      radial-gradient(700px 500px at 100% 100%, rgba(34,211,238,0.08), transparent 60%),
-      radial-gradient(600px 500px at 0% 80%, rgba(139,92,246,0.08), transparent 60%);
-    font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 15px/1.5 "Plus Jakarta Sans", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow-x: hidden;
   }
   a { color: inherit; }
+  button { font: inherit; }
+
+  /* ---- Background: soft sky gradient + light waves (bottom-left, top-right) ---- */
+  .bg { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(900px 520px at 50% 38%, rgba(34,211,238,0.10), transparent 65%),
+      radial-gradient(700px 500px at 100% 0%, rgba(139,92,246,0.06), transparent 60%),
+      linear-gradient(180deg, #f8fbfe 0%, #f1f6fb 100%);
+  }
+  .bg svg { position: absolute; width: 100%; height: 100%; }
 
   /* ---- Header ---- */
   header {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-    max-width: 1280px; margin: 0 auto; padding: 18px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 32px; border-bottom: 1px solid rgba(15,36,64,0.06); background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10;
   }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo {
-    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-weight: 700;
-    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04101f;
-    box-shadow: 0 8px 24px rgba(79,140,255,0.35);
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .brand svg { width: 34px; height: 34px; color: var(--teal-d); flex: none; }
+  .brand b { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--navy); }
+  .brand small { display: block; font-size: 11.5px; color: var(--muted); margin-top: -2px; }
+  .head-right { display: flex; align-items: center; gap: 18px; }
+  .pill-online {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;
+    color: var(--teal-d); background: rgba(20,184,166,0.10); padding: 6px 12px; border-radius: 999px;
   }
-  .brand h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
-  .nav { display: flex; gap: 8px; flex-wrap: wrap; }
-  .nav a {
-    text-decoration: none; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 10px;
-    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
-    transition: background .15s, border-color .15s;
+  .pill-online .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px rgba(16,185,129,0.18); }
+  .pill-online.off { color: var(--muted); background: rgba(100,116,139,0.10); }
+  .pill-online.off .dot { background: var(--faint); box-shadow: none; }
+  .divider { width: 1px; height: 28px; background: var(--line); }
+  .user { position: relative; }
+  .user-btn {
+    display: flex; align-items: center; gap: 10px; background: none; border: 0; cursor: pointer; padding: 4px; border-radius: 12px;
+    color: var(--text); font-weight: 600; font-size: 13.5px;
   }
-  .nav a:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+  .user-btn:hover { background: rgba(15,36,64,0.04); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--navy); color: #fff; font-size: 11.5px; font-weight: 700; }
+  .user-btn svg { width: 14px; height: 14px; color: var(--muted); }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 18px 40px rgba(15,36,64,0.12); padding: 6px; display: none;
+  }
+  .menu.open { display: block; }
+  .menu a { display: block; padding: 9px 12px; border-radius: 10px; text-decoration: none; font-size: 13.5px; }
+  .menu a:hover { background: var(--bg); }
+  .menu small { display: block; color: var(--muted); font-size: 11.5px; }
 
-  /* ---- Layout ---- */
-  main {
-    max-width: 1280px; margin: 0 auto; padding: 4px 24px 40px;
-    display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 20px; align-items: start;
-  }
-  .panel {
-    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 18px; padding: 18px;
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  }
-  .panel + .panel { margin-top: 16px; }
-  .panel h2 { margin: 0 0 12px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-  .stack { display: flex; flex-direction: column; gap: 16px; }
+  /* ---- Hero ---- */
+  .hero { text-align: center; padding: 56px 16px 28px; }
+  .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.22em; color: var(--teal-d); text-transform: uppercase; margin: 0 0 14px; }
+  .hero h1 { margin: 0; font-size: clamp(26px, 4vw, 34px); font-weight: 700; letter-spacing: -0.02em; color: var(--navy); }
+  .hero .lead { margin: 12px auto 0; max-width: 440px; color: var(--muted); font-size: 15px; }
 
-  /* ---- Business card ---- */
-  .biz-name { font-size: 18px; font-weight: 600; margin: 0 0 2px; letter-spacing: -0.01em; }
-  .biz-tag { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
-  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
-  .badge.open { background: rgba(52,211,153,0.12); color: var(--good); }
-  .badge.closed { background: rgba(248,113,113,0.12); color: var(--danger); }
-  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .facts { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 10px; font-size: 13.5px; }
-  .facts li { display: flex; justify-content: space-between; gap: 10px; }
-  .facts span:first-child { color: var(--muted); }
-  .facts span:last-child { text-align: right; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: #c9d3e6; }
-  .tech { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13.5px; }
-  .avatar {
-    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600;
-    background: linear-gradient(135deg, rgba(79,140,255,0.35), rgba(34,211,238,0.25)); color: #dbe7ff;
-  }
-  .tech small { display: block; color: var(--muted); font-size: 12px; }
-  .alert {
-    border: 1px solid rgba(248,113,113,0.35); background: rgba(248,113,113,0.08); color: #fecaca;
-    border-radius: 14px; padding: 12px 14px; font-size: 13px;
-  }
-  .alert strong { color: #fff; display: block; margin-bottom: 2px; }
+  .stage { position: relative; width: min(980px, 100%); height: 320px; margin: 18px auto 0; }
+  #orb { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 
-  /* ---- Center stage ---- */
-  .stage { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18px 18px 22px; }
-  .stage-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
-  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
-  .live.on .dot { background: var(--good); box-shadow: 0 0 0 0 rgba(52,211,153,0.6); animation: ping 1.6s infinite; }
-  @keyframes ping { to { box-shadow: 0 0 0 10px rgba(52,211,153,0); } }
-  .timer { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--muted); }
-  .orb-wrap { position: relative; width: min(380px, 78vw); aspect-ratio: 1; margin: 6px 0 4px; }
-  #orb { width: 100%; height: 100%; display: block; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
-  .orb-hint {
-    position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); font-size: 12px; color: var(--muted);
-    pointer-events: none; white-space: nowrap;
+  .controls { display: flex; justify-content: center; gap: 48px; margin-top: 18px; }
+  .ctl { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .ctl span { font-size: 14px; font-weight: 600; color: var(--text); }
+  .ctl.dim span { color: var(--muted); font-weight: 500; }
+  .round {
+    width: 64px; height: 64px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+    transition: transform .1s, box-shadow .2s, background .2s, opacity .2s;
+    touch-action: none; user-select: none; -webkit-user-select: none;
   }
-  .state { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; margin: 4px 0 2px; min-height: 32px; }
-  .substate { color: var(--muted); font-size: 14px; min-height: 22px; margin: 0 0 18px; }
-  .substate.error { color: var(--danger); }
-  .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-  button {
-    font: inherit; font-weight: 600; border: none; cursor: pointer; border-radius: 14px; padding: 13px 24px;
-    transition: transform .08s, filter .15s, opacity .15s;
+  .round svg { width: 24px; height: 24px; }
+  .round:active:not(:disabled) { transform: scale(0.96); }
+  .round:disabled { cursor: not-allowed; }
+  .round.call {
+    color: #fff; background: linear-gradient(145deg, #1cc4b1, var(--teal-d));
+    box-shadow: 0 0 0 9px rgba(20,184,166,0.14), 0 14px 30px rgba(13,148,136,0.35);
   }
-  button:active { transform: scale(0.98); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  .btn-primary { background: linear-gradient(135deg, var(--accent), #6d7bff); color: #fff; box-shadow: 0 10px 30px rgba(79,140,255,0.35); }
-  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-  .btn-danger { background: rgba(248,113,113,0.14); color: #fecaca; border: 1px solid rgba(248,113,113,0.35); }
-  .btn-ghost { background: var(--panel); color: var(--text); border: 1px solid var(--panel-border); touch-action: none; user-select: none; -webkit-user-select: none; }
-  .btn-ghost.recording { background: rgba(52,211,153,0.16); border-color: rgba(52,211,153,0.5); color: #bbf7d0; }
-  .steps { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
-  .step { font-size: 12px; padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--faint); border: 1px solid transparent; transition: all .2s; }
-  .step.active { color: var(--text); border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); }
-  .kbd { font-size: 12px; color: var(--faint); margin-top: 12px; }
-  kbd { font: 600 11px/1 Inter, sans-serif; padding: 3px 6px; border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid var(--panel-border); }
+  .round.call:hover:not(:disabled) { box-shadow: 0 0 0 11px rgba(20,184,166,0.18), 0 16px 34px rgba(13,148,136,0.42); }
+  .round.call.end { background: linear-gradient(145deg, #f87171, var(--danger)); box-shadow: 0 0 0 9px rgba(239,68,68,0.12), 0 14px 30px rgba(239,68,68,0.32); }
+  .round.call.end svg { transform: rotate(135deg); }
+  .round.hold {
+    color: var(--muted); background: #fff; border: 1px solid var(--line);
+    box-shadow: 0 0 0 9px rgba(255,255,255,0.7), 0 10px 26px rgba(15,36,64,0.08);
+  }
+  .round.hold:disabled { opacity: .75; }
+  .round.hold.ready { color: var(--teal-d); border-color: rgba(20,184,166,0.45); }
+  .round.hold.recording { color: #fff; background: var(--good); border-color: var(--good); box-shadow: 0 0 0 9px rgba(16,185,129,0.18), 0 10px 26px rgba(16,185,129,0.35); }
 
-  /* ---- Services ---- */
-  .services { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-  .svc { padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); }
-  .svc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .svc-name { font-weight: 600; font-size: 13.5px; }
-  .svc-price { font-size: 13px; color: var(--accent2); font-weight: 600; white-space: nowrap; }
-  .svc p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
-  .owner-tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--warn); }
+  .status { display: inline-flex; align-items: center; gap: 10px; margin-top: 34px; font-size: 13px; color: var(--muted); min-height: 20px; }
+  .status svg { width: 18px; height: 18px; color: var(--teal); flex: none; }
+  .status.error { color: var(--danger); }
+  .status.error svg { color: var(--danger); }
+  .timer { font-variant-numeric: tabular-nums; color: var(--faint); }
+  .tip { margin-top: 8px; font-size: 12px; color: var(--faint); min-height: 18px; }
+  kbd { font: 600 11px/1 inherit; padding: 2px 6px; border-radius: 6px; background: #fff; border: 1px solid var(--line); }
 
-  /* ---- How it works ---- */
-  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .how div { padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.035); font-size: 12.5px; color: var(--muted); }
-  .how b { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+  /* ---- Below the fold ---- */
+  .below { max-width: 1080px; margin: 40px auto 0; padding: 0 24px 40px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .card { background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 6px 24px rgba(15,36,64,0.04); }
+  .card + .card { margin-top: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display: flex; justify-content: space-between; align-items: center; }
+  .card h2 em { font-style: normal; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--faint); }
 
-  /* ---- Transcript ---- */
-  .transcript { display: flex; flex-direction: column; gap: 10px; height: 430px; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
+  .transcript { display: flex; flex-direction: column; gap: 10px; height: 380px; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
   .transcript::-webkit-scrollbar { width: 6px; }
-  .transcript::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 6px; }
-  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 14px; animation: rise .25s ease-out; }
-  .msg small { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
-  .msg.caller { align-self: flex-end; background: var(--caller); border-bottom-right-radius: 4px; }
-  .msg.assistant { align-self: flex-start; background: var(--ai); border-bottom-left-radius: 4px; }
-  .msg.system { align-self: center; background: rgba(251,191,36,0.1); color: #fde68a; font-size: 12.5px; text-align: center; }
+  .transcript::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+  .msg { max-width: 86%; padding: 10px 14px; border-radius: 16px; font-size: 14px; animation: rise .25s ease-out; }
+  .msg small { display: block; font-size: 11px; font-weight: 700; margin-bottom: 2px; color: var(--muted); }
+  .msg.caller { align-self: flex-end; background: linear-gradient(145deg, #1cc4b1, var(--teal-d)); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.caller small { color: rgba(255,255,255,0.8); }
+  .msg.assistant { align-self: flex-start; background: #f1f5f9; border-bottom-left-radius: 4px; }
+  .msg.system { align-self: center; background: rgba(245,158,11,0.12); color: #92400e; font-size: 12.5px; text-align: center; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
   .empty { margin: auto; text-align: center; color: var(--faint); font-size: 13.5px; padding: 20px; }
-  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .meta div { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.035); }
-  .meta small { display: block; color: var(--muted); font-size: 11.5px; }
-  .meta b { font-size: 14px; font-weight: 600; }
+  .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  .meta div { padding: 10px 12px; border-radius: 12px; background: var(--bg); }
+  .meta small { display: block; color: var(--muted); font-size: 11px; }
+  .meta b { font-size: 13.5px; font-weight: 600; }
+
+  .biz-name { font-size: 17px; font-weight: 700; margin: 0; color: var(--navy); }
+  .biz-tag { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  .badge.open { background: rgba(16,185,129,0.12); color: #047857; }
+  .badge.closed { background: rgba(239,68,68,0.10); color: #b91c1c; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .facts { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 9px; font-size: 13.5px; }
+  .facts li { display: flex; justify-content: space-between; gap: 10px; }
+  .facts span:first-child { color: var(--muted); }
+  .facts span:last-child { text-align: right; font-weight: 500; }
+  .facts a { color: var(--teal-d); font-weight: 600; text-decoration: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line2); color: #334155; }
+  .tech { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .tech .avatar { width: 30px; height: 30px; font-size: 11px; background: linear-gradient(145deg, #5eead4, var(--blue)); }
+  .tech small { display: block; color: var(--muted); font-size: 12px; }
+  .services { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .svc { padding: 12px 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line2); }
+  .svc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .svc-name { font-weight: 600; font-size: 13.5px; }
+  .svc-price { font-size: 13px; color: var(--teal-d); font-weight: 700; white-space: nowrap; }
+  .svc p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+  .owner-tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700; color: #b45309; }
+  .alert { border: 1px solid rgba(239,68,68,0.25); background: rgba(239,68,68,0.05); color: #7f1d1d; border-radius: 14px; padding: 12px 14px; font-size: 13px; margin-top: 20px; }
+  .alert strong { display: block; color: #991b1b; margin-bottom: 2px; }
+  .full { grid-column: 1 / -1; }
   footer { text-align: center; color: var(--faint); font-size: 12.5px; padding: 0 24px 28px; }
 
-  @media (max-width: 1100px) {
-    main { grid-template-columns: 1fr; }
-    .col-center { order: -1; }
-    .transcript { height: 320px; }
+  @media (max-width: 900px) {
+    .below { grid-template-columns: 1fr; }
+    .meta { grid-template-columns: 1fr 1fr; }
   }
-  @media (max-width: 560px) {
-    header, main { padding-left: 16px; padding-right: 16px; }
-    .how { grid-template-columns: 1fr; }
-    .state { font-size: 19px; }
+  @media (max-width: 640px) {
+    header { padding: 12px 16px; }
+    .pill-online, .divider, .user-name { display: none; }
+    .hero { padding-top: 36px; }
+    .stage { height: 260px; }
+    .below { padding: 0 16px 32px; }
   }
-  @media (prefers-reduced-motion: reduce) { .live.on .dot { animation: none; } }
 </style>
 </head>
 <body>
+<div class="bg" aria-hidden="true">
+  <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+    <path d="M0 640 C 260 560, 420 760, 760 720 S 1200 860, 1440 820 L1440 900 L0 900 Z" fill="rgba(186,230,253,0.28)"/>
+    <path d="M0 720 C 300 650, 520 840, 860 800 S 1260 900, 1440 880 L1440 900 L0 900 Z" fill="rgba(204,251,241,0.35)"/>
+    <path d="M900 0 C 1100 80, 1260 40, 1440 120 L1440 0 Z" fill="rgba(221,214,254,0.22)"/>
+  </svg>
+</div>
+
 <header>
-  <div class="brand">
-    <div class="logo">T</div>
-    <div>
-      <h1 id="biz-header">AI Receptionist</h1>
-      <p>Powered by Talkse · human-in-the-loop voice agent</p>
+  <a class="brand" href="/">
+    <!-- snowflake -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 2v20M4.2 6.5l15.6 9M4.2 17.5l15.6-9"/>
+      <path d="M9.5 3.5 12 6l2.5-2.5M9.5 20.5 12 18l2.5 2.5M3.3 9.6l3.4.9-.9 3.4M20.7 14.4l-3.4-.9.9-3.4M3.3 14.4l3.4-.9-.9-3.4M20.7 9.6l-3.4.9.9 3.4"/>
+    </svg>
+    <span><b id="brand-name">Cool Breeze</b><small>HVAC &amp; Home Services</small></span>
+  </a>
+  <div class="head-right">
+    <span class="pill-online" id="online"><span class="dot"></span><span id="online-text">System Online</span></span>
+    <span class="divider"></span>
+    <div class="user">
+      <button class="user-btn" id="user-btn" aria-haspopup="true" aria-expanded="false">
+        <span class="avatar" id="owner-initials">MH</span>
+        <span class="user-name" id="owner-name">Muhammad Haris</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="menu" id="menu" role="menu">
+        <a href="/owner" target="_blank" rel="noopener">Owner console<small>Approve jobs and answer questions live</small></a>
+        <a id="crm-link" href="#" target="_blank" rel="noopener" hidden>Open FlowCRM<small>Every call becomes a lead</small></a>
+        <a id="tel-link" href="#" hidden>Call from a phone<small id="tel-text"></small></a>
+      </div>
     </div>
   </div>
-  <nav class="nav">
-    <a href="/owner" target="_blank" rel="noopener">Owner console</a>
-    <a id="crm-link" href="#" target="_blank" rel="noopener" hidden>Open CRM</a>
-  </nav>
 </header>
 
-<main>
-  <!-- Left: business details -->
-  <aside class="stack">
-    <section class="panel">
+<section class="hero">
+  <p class="eyebrow">AI Voice Receptionist</p>
+  <h1>Your 24/7 AI Receptionist</h1>
+  <p class="lead">Answering calls, handling questions, and booking appointments for your HVAC &amp; home services.</p>
+
+  <div class="stage">
+    <canvas id="orb" aria-label="Voice assistant. Hold the orb to talk during a call." role="button"></canvas>
+  </div>
+
+  <div class="controls">
+    <div class="ctl" id="ctl-call">
+      <button class="round call" id="start" aria-label="Start call">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
+      </button>
+      <span id="call-label">Start Call</span>
+    </div>
+    <div class="ctl dim" id="ctl-hold">
+      <button class="round hold" id="talk" aria-label="Hold to talk" disabled>
+        <svg id="ico-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="5" width="3.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="3.2" height="14" rx="1.2"/></svg>
+        <svg id="ico-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <span id="hold-label">Hold</span>
+    </div>
+  </div>
+
+  <div class="status" id="status-row">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
+    <span id="substate">Ready to take calls</span>
+    <span class="timer" id="timer" hidden>00:00</span>
+  </div>
+  <div class="tip" id="tip">Press Start Call, then hold the orb, the Hold button or <kbd>Space</kbd> while you speak.</div>
+</section>
+
+<section class="below">
+  <div>
+    <div class="card">
+      <h2>Live transcript <em id="m-status">Not started</em></h2>
+      <div class="transcript" id="chat"><div class="empty" id="empty">The conversation will appear here.</div></div>
+      <div class="meta">
+        <div><small>Status</small><b id="m-status2">Idle</b></div>
+        <div><small>Turns</small><b id="m-turns">0</b></div>
+        <div><small>Voice</small><b id="m-voice">–</b></div>
+        <div><small>Call ID</small><b id="m-id">–</b></div>
+      </div>
+    </div>
+  </div>
+  <aside>
+    <div class="card">
       <p class="biz-name" id="biz-name">Loading…</p>
       <p class="biz-tag" id="biz-tagline"></p>
       <span class="badge closed" id="open-badge"><span class="dot"></span><span id="open-text">…</span></span>
@@ -191,89 +271,34 @@
         <li><span>Phone</span><span id="phone">–</span></li>
         <li><span>Owner</span><span id="owner">–</span></li>
       </ul>
-    </section>
-    <section class="panel">
+    </div>
+    <div class="card">
       <h2>Service area</h2>
       <div class="chips" id="area"></div>
-    </section>
-    <section class="panel">
+    </div>
+    <div class="card">
       <h2>Technicians</h2>
       <div id="techs"></div>
-    </section>
+    </div>
     <div class="alert">
       <strong>Smell gas or see sparks?</strong>
-      Leave the house first and call 911. The AI will give safety steps and alert the owner instantly.
+      Leave the house first and call 911. The AI gives safety steps and alerts the owner instantly.
     </div>
   </aside>
-
-  <!-- Center: voice orb -->
-  <div class="col-center stack">
-    <section class="panel stage">
-      <div class="stage-top">
-        <span class="live" id="live"><span class="dot"></span><span id="live-text">Ready</span></span>
-        <span class="timer" id="timer">00:00</span>
-      </div>
-      <div class="orb-wrap">
-        <canvas id="orb" aria-label="Voice assistant. Hold to talk during a call." role="button"></canvas>
-        <div class="orb-hint" id="orb-hint">Press Start call</div>
-      </div>
-      <div class="state" id="state">Hi, I'm your AI receptionist</div>
-      <p class="substate" id="substate">I can book a technician, answer questions, and check with the owner when needed.</p>
-      <div class="controls">
-        <button class="btn-primary" id="start">Start call</button>
-        <button class="btn-ghost" id="talk" disabled>Hold to talk</button>
-        <button class="btn-danger" id="end" hidden>End call</button>
-      </div>
-      <div class="steps">
-        <span class="step" data-step="listening">Listening</span>
-        <span class="step" data-step="thinking">Thinking</span>
-        <span class="step" data-step="speaking">Speaking</span>
-        <span class="step" data-step="waiting">Checking with owner</span>
-      </div>
-      <div class="kbd">Hold the orb, the button, or <kbd>Space</kbd> while you speak · release to send</div>
-    </section>
-
-    <section class="panel">
-      <h2>Services &amp; prices</h2>
-      <div class="services" id="services"></div>
-    </section>
-
-    <section class="panel">
-      <h2>How it works</h2>
-      <div class="how">
-        <div><b>1 · AI books routine jobs</b>Repairs, tune-ups and plumbing are booked on the call, with a real technician and time.</div>
-        <div><b>2 · Owner decides big ones</b><span id="how-owner">Installs, commercial jobs and new questions go to the owner live, by phone or console.</span></div>
-        <div><b>3 · Everything lands in the CRM</b>Every call becomes a contact, lead and job in FlowCRM, instantly.</div>
-      </div>
-    </section>
+  <div class="card full">
+    <h2>Services &amp; prices</h2>
+    <div class="services" id="services"></div>
   </div>
-
-  <!-- Right: live transcript -->
-  <aside class="stack">
-    <section class="panel">
-      <h2>Live transcript</h2>
-      <div class="transcript" id="chat"><div class="empty" id="empty">The conversation will appear here.</div></div>
-    </section>
-    <section class="panel">
-      <h2>Call details</h2>
-      <div class="meta">
-        <div><small>Status</small><b id="m-status">Not started</b></div>
-        <div><small>Turns</small><b id="m-turns">0</b></div>
-        <div><small>Voice</small><b id="m-voice">–</b></div>
-        <div><small>Call ID</small><b id="m-id">–</b></div>
-      </div>
-    </section>
-  </aside>
-</main>
+</section>
 
 <footer id="footer">Talkse AI receptionist · calls are recorded in the business CRM</footer>
 
 <script>
   // ---------------------------------------------------------------- elements
   const $ = id => document.getElementById(id);
-  const chat = $("chat"), startBtn = $("start"), talkBtn = $("talk"), endBtn = $("end"), orbCanvas = $("orb");
+  const chat = $("chat"), startBtn = $("start"), talkBtn = $("talk"), orbCanvas = $("orb");
 
-  let callId = null, stream = null, recorder = null, chunks = [], recordStart = 0;
+  let callId = null, stream = null, recorder = null, chunks = [], recordStart = 0, inCall = false;
   let busy = false, audioEl = null, ownerName = "the owner", turns = 0, callStarted = 0, timerId = null, canTalk = false;
 
   // Safari records audio/mp4, Chrome/Firefox audio/webm; Groq accepts both
@@ -282,30 +307,33 @@
   const EXT = MIME.includes("mp4") ? "m4a" : "webm";
 
   // ---------------------------------------------------------------- UI state
-  const STATES = {
-    idle:      { title: "Hi, I'm your AI receptionist", live: "Ready" },
-    connecting:{ title: "Connecting…", live: "Connecting" },
-    yourturn:  { title: "Your turn", live: "Live" },
-    listening: { title: "Listening…", live: "Live" },
-    thinking:  { title: "Thinking…", live: "Live" },
-    speaking:  { title: "Speaking", live: "Live" },
-    waiting:   { title: "Checking with the owner", live: "On hold" },
-    ended:     { title: "Call ended", live: "Ended" },
+  const DEFAULT_SUB = {
+    idle: "Ready to take calls", connecting: "Connecting…", yourturn: "Your turn: hold to talk",
+    listening: "Listening… release to send", thinking: "Thinking…", speaking: "Speaking…",
+    waiting: "On hold, checking with the owner…", ended: "Call ended",
   };
   let uiState = "idle";
 
   function setState(state, sub = null, { error = false } = {}) {
     uiState = state;
-    const s = STATES[state];
-    $("state").textContent = state === "waiting" ? `Checking with ${ownerName}` : s.title;
-    if (sub !== null) $("substate").textContent = sub;
-    $("substate").classList.toggle("error", error);
-    $("live-text").textContent = s.live;
-    $("live").classList.toggle("on", ["yourturn", "listening", "thinking", "speaking", "waiting"].includes(state));
-    document.querySelectorAll(".step").forEach(el => el.classList.toggle("active", el.dataset.step === state));
-    $("orb-hint").textContent = state === "yourturn" ? "Hold to talk" : state === "idle" ? "Press Start call"
-      : state === "listening" ? "Release to send" : "";
+    let text = sub || DEFAULT_SUB[state];
+    if (state === "waiting" && !sub) text = `On hold, checking with ${ownerName}…`;
+    $("substate").textContent = text;
+    $("status-row").classList.toggle("error", error);
+    talkBtn.classList.toggle("ready", state === "yourturn");
     orb.setMode(state);
+  }
+
+  function setCallButton(active) {
+    inCall = active;
+    startBtn.classList.toggle("end", active);
+    startBtn.setAttribute("aria-label", active ? "End call" : "Start call");
+    $("call-label").textContent = active ? "End Call" : "Start Call";
+    $("ico-pause").hidden = active;
+    $("ico-mic").hidden = !active;
+    $("hold-label").textContent = active ? "Hold to talk" : "Hold";
+    $("ctl-hold").classList.toggle("dim", !active);
+    $("timer").hidden = !active;
   }
 
   function addMsg(role, text) {
@@ -322,16 +350,19 @@
   function setMeta(status) {
     const labels = { collecting: "In progress", waiting_human: "On hold (owner)", done: "Completed",
                      needs_human: "Owner will call back", emergency: "Safety alert" };
-    $("m-status").textContent = labels[status] || status;
+    const label = labels[status] || status;
+    $("m-status").textContent = label;
+    $("m-status2").textContent = label;
     $("m-turns").textContent = turns;
   }
 
   function startTimer() {
     callStarted = Date.now();
     clearInterval(timerId);
+    $("timer").textContent = "· 00:00";
     timerId = setInterval(() => {
       const s = Math.floor((Date.now() - callStarted) / 1000);
-      $("timer").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+      $("timer").textContent = `· ${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
     }, 500);
   }
 
@@ -359,25 +390,26 @@
     return 0;
   }
 
-  // ---------------------------------------------------------------- 3D voice orb
+  // ---------------------------------------------------------------- glass voice orb + side waves
   const orb = (() => {
     const ctx = orbCanvas.getContext("2d");
+    // [highlight, mid, deep] colours of the inner sphere per state
     const palette = {
-      idle:      [[79, 140, 255], [34, 211, 238]],
-      connecting:[[79, 140, 255], [139, 92, 246]],
-      yourturn:  [[79, 140, 255], [34, 211, 238]],
-      listening: [[16, 185, 129], [34, 211, 238]],
-      thinking:  [[139, 92, 246], [79, 140, 255]],
-      speaking:  [[59, 130, 246], [34, 211, 238]],
-      waiting:   [[245, 158, 11], [251, 191, 36]],
-      ended:     [[100, 116, 139], [71, 85, 105]],
+      idle:      [[103, 232, 249], [34, 197, 230], [37, 99, 235]],
+      connecting:[[125, 211, 252], [99, 102, 241], [79, 70, 229]],
+      yourturn:  [[103, 232, 249], [34, 197, 230], [37, 99, 235]],
+      listening: [[110, 231, 183], [20, 184, 166], [13, 148, 136]],
+      thinking:  [[196, 181, 253], [139, 92, 246], [79, 70, 229]],
+      speaking:  [[103, 232, 249], [56, 189, 248], [37, 99, 235]],
+      waiting:   [[253, 230, 138], [251, 191, 36], [217, 119, 6]],
+      ended:     [[203, 213, 225], [148, 163, 184], [100, 116, 139]],
     };
-    let mode = "idle", level = 0, cur = palette.idle.map(c => c.slice());
+    let mode = "idle", level = 0, cur = palette.idle.map(c => c.slice()), orbR = 60, W = 0, H = 0;
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const size = orbCanvas.clientWidth;
-      orbCanvas.width = size * dpr; orbCanvas.height = size * dpr;
+      W = orbCanvas.clientWidth; H = orbCanvas.clientHeight;
+      orbCanvas.width = W * dpr; orbCanvas.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener("resize", resize);
@@ -385,110 +417,140 @@
 
     const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 
+    function waves(cx, cy, side, time, speed, ring) {
+      // Flowing lines that leave the orb and fade towards the screen edge
+      const start = cx + side * (ring + 6), end = side < 0 ? 0 : W, span = Math.abs(end - start);
+      const cols = side < 0 ? [[45, 212, 191], [56, 189, 248], [94, 234, 212]] : [[129, 140, 248], [167, 139, 250], [147, 197, 253]];
+      for (let k = 0; k < 3; k++) {
+        ctx.beginPath();
+        for (let i = 0; i <= 80; i++) {
+          const p = i / 80, x = start + side * p * span;
+          const env = Math.sin(Math.PI * Math.min(1, p * 1.25)) * (1 - p * 0.55);
+          const amp = (10 + k * 5 + level * 38) * env;
+          const y = cy + Math.sin(p * (6 + k * 1.7) - time * speed * (1.4 + k * 0.3) * side + k) * amp;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        const g = ctx.createLinearGradient(start, 0, end, 0);
+        g.addColorStop(0, rgba(cols[k], 0.0));
+        g.addColorStop(0.15, rgba(cols[k], 0.55 - k * 0.12 + level * 0.3));
+        g.addColorStop(1, rgba(cols[k], 0));
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+    }
+
     function frame(t) {
-      const size = orbCanvas.clientWidth, cx = size / 2, cy = size / 2, base = size * 0.27;
+      const cx = W / 2, cy = H / 2, time = t / 1000;
       const target = palette[mode] || palette.idle;
-      for (let i = 0; i < 2; i++) for (let k = 0; k < 3; k++) cur[i][k] += (target[i][k] - cur[i][k]) * 0.06;
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) cur[i][k] += (target[i][k] - cur[i][k]) * 0.06;
       level += (currentLevel() - level) * 0.25;
+      const speed = mode === "thinking" ? 2.4 : mode === "waiting" ? 1.0 : mode === "idle" || mode === "ended" ? 0.5 : 1.3;
+      const breathe = mode === "waiting" ? 0.03 * Math.sin(time * 3) : 0.012 * Math.sin(time * 1.6);
+      const unit = Math.min(H, 340) / 320;
+      const ring = 84 * unit * (1 + breathe + level * 0.05);
+      orbR = ring;
+      const [c1, c2, c3] = cur;
 
-      const time = t / 1000;
-      const speed = mode === "thinking" ? 2.6 : mode === "waiting" ? 1.2 : mode === "idle" ? 0.6 : 1.4;
-      const breathe = mode === "waiting" ? 0.04 * Math.sin(time * 3) : 0.015 * Math.sin(time * 1.6);
-      const energy = 0.05 + level * 0.32 + (mode === "thinking" ? 0.06 : 0);
-      const r = base * (1 + breathe + level * 0.18);
-      const [c1, c2] = cur;
+      ctx.clearRect(0, 0, W, H);
 
-      ctx.clearRect(0, 0, size, size);
-
-      // Outer glow
-      const glow = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 2.1);
-      glow.addColorStop(0, rgba(c1, 0.35 + level * 0.3));
-      glow.addColorStop(0.5, rgba(c2, 0.08));
-      glow.addColorStop(1, rgba(c2, 0));
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, size, size);
-
-      // Orbit rings (tilted ellipses give depth)
-      for (let i = 0; i < 3; i++) {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(time * speed * (0.2 + i * 0.12) * (i % 2 ? -1 : 1) + i);
-        ctx.scale(1, 0.32 + i * 0.08);
+      // Soft halo and faint concentric rings
+      const halo = ctx.createRadialGradient(cx, cy, ring * 0.8, cx, cy, Math.min(ring * 1.85, H / 2));
+      halo.addColorStop(0, rgba(c2, 0.16 + level * 0.18));
+      halo.addColorStop(1, rgba(c2, 0));
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, W, H);
+      [1.22, 1.46].forEach((m, i) => {
         ctx.beginPath();
-        ctx.arc(0, 0, r * (1.32 + i * 0.16 + level * 0.12), 0, Math.PI * 2);
-        ctx.strokeStyle = rgba(i % 2 ? c2 : c1, 0.18 - i * 0.04 + level * 0.12);
-        ctx.lineWidth = 1.2;
+        ctx.arc(cx, cy, ring * (m + level * 0.06 * (i + 1)), 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(148,163,184,${0.20 - i * 0.07})`;
+        ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.restore();
-      }
+      });
 
-      // Deformed sphere surface
-      const pts = 96;
-      ctx.beginPath();
-      for (let i = 0; i <= pts; i++) {
-        const a = (i / pts) * Math.PI * 2;
-        const wobble =
-          Math.sin(a * 3 + time * speed * 1.3) * 0.5 +
-          Math.sin(a * 5 - time * speed * 1.7) * 0.3 +
-          Math.sin(a * 2 + time * speed * 0.7) * 0.2;
-        const rr = r * (1 + wobble * energy);
-        const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
-        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-      }
-      ctx.closePath();
-      const body = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.15);
-      body.addColorStop(0, "rgba(255,255,255,0.95)");
-      body.addColorStop(0.18, rgba(c2, 0.95));
-      body.addColorStop(0.62, rgba(c1, 0.92));
-      body.addColorStop(1, rgba([c1[0] * 0.25, c1[1] * 0.25, c1[2] * 0.35], 0.95));
-      ctx.fillStyle = body;
-      ctx.shadowColor = rgba(c1, 0.6);
-      ctx.shadowBlur = 40 + level * 40;
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      waves(cx, cy, -1, time, speed, ring * 1.1);
+      waves(cx, cy, 1, time, speed, ring * 1.1);
 
-      // Inner flowing bands (clipped to the sphere) for a 3D, liquid look
+      // White glass disc
       ctx.save();
-      ctx.clip();
-      for (let i = 0; i < 4; i++) {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(time * speed * 0.4 * (i % 2 ? 1 : -1) + i * 0.8);
-        ctx.scale(1, 0.45);
-        ctx.beginPath();
-        ctx.ellipse(r * 0.15 * Math.sin(time + i), 0, r * (0.9 - i * 0.15), r * 0.55, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255,255,255,${0.10 + level * 0.15})`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.restore();
+      ctx.beginPath();
+      ctx.arc(cx, cy, ring, 0, Math.PI * 2);
+      ctx.shadowColor = rgba(c2, 0.45 + level * 0.3);
+      ctx.shadowBlur = 36 + level * 30;
+      const disc = ctx.createRadialGradient(cx - ring * 0.3, cy - ring * 0.4, ring * 0.1, cx, cy, ring);
+      disc.addColorStop(0, "#ffffff");
+      disc.addColorStop(1, "#eef7fb");
+      ctx.fillStyle = disc;
+      ctx.fill();
+      ctx.restore();
+
+      // Rotating gradient rim (teal -> blue -> violet)
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(time * speed * 0.6);
+      let rim;
+      if (ctx.createConicGradient) {
+        rim = ctx.createConicGradient(0, 0, 0);
+        rim.addColorStop(0, "rgba(45,212,191,0.9)");
+        rim.addColorStop(0.35, "rgba(59,130,246,0.9)");
+        rim.addColorStop(0.6, "rgba(167,139,250,0.9)");
+        rim.addColorStop(0.8, "rgba(255,255,255,0.4)");
+        rim.addColorStop(1, "rgba(45,212,191,0.9)");
+      } else {
+        rim = ctx.createLinearGradient(-ring, 0, ring, 0);
+        rim.addColorStop(0, "#2dd4bf"); rim.addColorStop(1, "#a78bfa");
       }
-      // Specular highlight and rim light
-      const spec = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.45, 0, cx - r * 0.38, cy - r * 0.45, r * 0.55);
+      ctx.beginPath();
+      ctx.arc(0, 0, ring - 2, 0, Math.PI * 2);
+      ctx.strokeStyle = rim;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+
+      // Inner sphere
+      const r = ring * 0.66 * (1 + level * 0.07);
+      const body = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.45, r * 0.05, cx, cy, r * 1.05);
+      body.addColorStop(0, rgba(c1, 1));
+      body.addColorStop(0.45, rgba(c2, 1));
+      body.addColorStop(1, rgba(c3, 1));
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.save();
+      ctx.shadowColor = rgba(c3, 0.35);
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = body;
+      ctx.fill();
+      ctx.restore();
+      const spec = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.5, 0, cx - r * 0.35, cy - r * 0.5, r * 0.7);
       spec.addColorStop(0, "rgba(255,255,255,0.55)");
       spec.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = spec;
-      ctx.fillRect(0, 0, size, size);
-      const rim = ctx.createRadialGradient(cx, cy, r * 0.75, cx, cy, r * 1.1);
-      rim.addColorStop(0, "rgba(0,0,0,0)");
-      rim.addColorStop(1, rgba(c2, 0.35));
-      ctx.fillStyle = rim;
-      ctx.fillRect(0, 0, size, size);
-      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Thinking: orbiting dots
-      if (mode === "thinking" || mode === "connecting") {
-        for (let i = 0; i < 3; i++) {
-          const a = time * 3 + (i * Math.PI * 2) / 3;
-          ctx.beginPath();
-          ctx.arc(cx + Math.cos(a) * r * 1.35, cy + Math.sin(a) * r * 0.45, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = rgba(c2, 0.9);
-          ctx.fill();
-        }
+      // Waveform bars inside the sphere
+      const bars = 7, gap = r * 0.16, bw = r * 0.07;
+      const shape = [0.35, 0.6, 0.85, 1, 0.85, 0.6, 0.35];
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      for (let i = 0; i < bars; i++) {
+        const live = mode === "thinking" ? 0.5 + 0.5 * Math.abs(Math.sin(time * 4 + i * 0.7))
+          : 0.75 + 0.25 * Math.sin(time * 2 + i) * (mode === "idle" ? 0.4 : 1) + level * 0.8 * Math.abs(Math.sin(time * 9 + i * 1.3));
+        const h = Math.min(r * 1.05, r * 0.55 * shape[i] * live + 4);
+        const x = cx + (i - (bars - 1) / 2) * gap - bw / 2;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, cy - h / 2, bw, h, bw / 2); else ctx.rect(x, cy - h / 2, bw, h);
+        ctx.fill();
       }
+
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
-    return { setMode: m => { mode = m; } };
+    return {
+      setMode: m => { mode = m; },
+      // Only the orb itself is a hold-to-talk target, not the waves around it
+      hit: (x, y) => Math.hypot(x - W / 2, y - H / 2) <= orbR,
+    };
   })();
 
   // ---------------------------------------------------------------- playback
@@ -550,8 +612,8 @@
       const data = await res.json();
       callId = data.call_id;
       $("m-id").textContent = callId.slice(0, 8);
-      startBtn.hidden = true;
-      endBtn.hidden = false;
+      setCallButton(true);
+      startBtn.disabled = false;
       startTimer();
       await handleReply(data);
     } catch (err) {
@@ -567,17 +629,24 @@
     allowTalk(false);
     clearInterval(timerId);
     callId = byUser ? null : callId;
-    endBtn.hidden = true;
-    startBtn.hidden = false;
+    setCallButton(false);
     startBtn.disabled = false;
-    startBtn.textContent = "New call";
+    $("call-label").textContent = "New Call";
     const labels = {
-      done: "All set! You'll get the technician at the booked time.",
+      done: "All set! The technician will arrive at the booked time.",
       needs_human: `${ownerName} will call you back shortly.`,
       emergency: `Please follow the safety steps. ${ownerName} has been alerted.`,
     };
     if (status) setMeta(status);
     setState("ended", byUser ? "You ended the call." : labels[status] || "Thanks for calling.");
+  }
+
+  function hangUp() {
+    if (recorder) { recorder.onstop = null; recorder.stop(); recorder = null; }
+    if (audioEl) audioEl.pause();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    talkBtn.classList.remove("recording");
+    endCall(null, { byUser: true });
   }
 
   function startRecording() {
@@ -592,14 +661,12 @@
     recordStart = Date.now();
     recorder.start();
     talkBtn.classList.add("recording");
-    talkBtn.textContent = "Listening…";
-    setState("listening", "Speak now, release when you're done.");
+    setState("listening");
   }
 
   function stopRecording() {
     if (!recorder) return;
     talkBtn.classList.remove("recording");
-    talkBtn.textContent = "Hold to talk";
     recorder.stop();
   }
 
@@ -632,12 +699,12 @@
   async function handleReply(data) {
     addMsg("assistant", data.reply_text);
     setMeta(data.status);
-    setState("speaking", "");
+    setState("speaking");
     await play(data.audio_b64, data.reply_text);
     if (!callId) return;
     if (data.status === "collecting") {
       allowTalk(true);
-      setState("yourturn", "Hold the orb or the button and speak.");
+      setState("yourturn");
     } else if (data.status === "waiting_human") {
       await waitForOwner();
     } else {
@@ -649,7 +716,7 @@
   async function waitForOwner() {
     allowTalk(false);
     addMsg("system", `On hold while ${ownerName} decides…`);
-    setState("waiting", `${ownerName} gets this on their phone and the owner console.`);
+    setState("waiting");
     while (callId) {
       await new Promise(r => setTimeout(r, 2000));
       try {
@@ -663,17 +730,21 @@
   }
 
   // ---------------------------------------------------------------- input wiring
-  startBtn.addEventListener("click", startCall);
-  endBtn.addEventListener("click", () => {
-    if (recorder) { recorder.onstop = null; recorder.stop(); recorder = null; }
-    if (audioEl) audioEl.pause();
-    if (window.speechSynthesis) speechSynthesis.cancel();
-    endCall(null, { byUser: true });
-  });
+  startBtn.addEventListener("click", () => (inCall ? hangUp() : startCall()));
 
   // Pointer events cover mouse and touch; capture keeps "release" working if the finger slides off
+  talkBtn.addEventListener("pointerdown", e => { if (!canTalk) return; talkBtn.setPointerCapture(e.pointerId); startRecording(); });
+  orbCanvas.addEventListener("pointerdown", e => {
+    const box = orbCanvas.getBoundingClientRect();
+    if (!canTalk || !orb.hit(e.clientX - box.left, e.clientY - box.top)) return;
+    orbCanvas.setPointerCapture(e.pointerId);
+    startRecording();
+  });
+  orbCanvas.addEventListener("pointermove", e => {
+    const box = orbCanvas.getBoundingClientRect();
+    orbCanvas.style.cursor = canTalk && orb.hit(e.clientX - box.left, e.clientY - box.top) ? "pointer" : "default";
+  });
   for (const el of [talkBtn, orbCanvas]) {
-    el.addEventListener("pointerdown", e => { if (!canTalk) return; el.setPointerCapture(e.pointerId); startRecording(); });
     el.addEventListener("pointerup", stopRecording);
     el.addEventListener("pointercancel", stopRecording);
     el.addEventListener("contextmenu", e => e.preventDefault());
@@ -685,14 +756,25 @@
   });
   document.addEventListener("keyup", e => { if (e.code === "Space") { e.preventDefault(); stopRecording(); } });
 
+  // Owner menu
+  $("user-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    const open = $("menu").classList.toggle("open");
+    $("user-btn").setAttribute("aria-expanded", open);
+  });
+  document.addEventListener("click", () => { $("menu").classList.remove("open"); $("user-btn").setAttribute("aria-expanded", false); });
+
   // ---------------------------------------------------------------- business details
   const money = v => v === 0 ? "Free" : v == null ? "" : `$${Number(v).toLocaleString("en-US")}`;
   const initials = n => n.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
 
   fetch("/api/info").then(r => r.json()).then(info => {
     ownerName = info.owner || ownerName;
+    const fullName = info.owner_full_name || info.owner;
     document.title = `${info.name} · AI Receptionist`;
-    $("biz-header").textContent = info.name;
+    $("brand-name").textContent = info.name.replace(/\s+home services$/i, "");
+    $("owner-name").textContent = fullName;
+    $("owner-initials").textContent = initials(fullName);
     $("biz-name").textContent = info.name;
     $("biz-tagline").textContent = info.tagline || "";
     $("open-badge").className = `badge ${info.open_now ? "open" : "closed"}`;
@@ -700,10 +782,15 @@
     $("hours-today").textContent = info.hours_today;
     $("local-time").textContent = `${info.local_time}${info.city ? " · " + info.city : ""}`;
     // Real SignalWire number: tap to call the same AI receptionist from a phone
-    $("phone").innerHTML = info.phone
-      ? `<a href="tel:${info.phone.replace(/[^+\d]/g, "")}" style="color:inherit">${info.phone}</a>`
-      : "–";
-    $("owner").textContent = `${info.owner} (${info.owner_title})`;
+    if (info.phone) {
+      const tel = `tel:${info.phone.replace(/[^+\d]/g, "")}`;
+      $("phone").innerHTML = `<a href="${tel}"></a>`;
+      $("phone").firstChild.textContent = info.phone;
+      $("tel-link").href = tel;
+      $("tel-text").textContent = `${info.phone} · same AI, real phone line`;
+      $("tel-link").hidden = false;
+    }
+    $("owner").textContent = `${fullName} (${info.owner_title})`;
     $("area").innerHTML = "";
     (info.service_area || []).forEach(a => {
       const c = document.createElement("span"); c.className = "chip"; c.textContent = a; $("area").appendChild(c);
@@ -730,12 +817,12 @@
       }
       $("services").appendChild(d);
     });
-    $("how-owner").textContent = `Installs, commercial jobs and new questions go to ${info.owner} live, on Telegram or the owner console.`;
     $("footer").textContent = `${info.name} · AI receptionist by Talkse · every call is recorded in the CRM`;
     if (info.crm_url) { $("crm-link").href = info.crm_url; $("crm-link").hidden = false; }
-    if (uiState === "idle") $("substate").textContent =
-      `I can book a technician, answer questions, and check with ${info.owner} when needed.`;
-  }).catch(() => {});
+  }).catch(() => {
+    $("online").classList.add("off");
+    $("online-text").textContent = "Offline";
+  });
 
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     startBtn.disabled = true;
