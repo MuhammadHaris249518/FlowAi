@@ -91,6 +91,7 @@
   let recordStart = 0;
   let busy = false;
   let audioEl = null;
+  let ownerName = "the owner";
 
   // Safari records audio/mp4, Chrome/Firefox audio/webm; Groq accepts both
   const MIME = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(
@@ -144,8 +145,8 @@
     startBtn.textContent = "New call";
     const labels = {
       done: "Call complete.",
-      needs_human: "A team member will follow up.",
-      emergency: "Call ended: please follow the safety instructions.",
+      needs_human: "The owner will call you back.",
+      emergency: "Please follow the safety instructions. The owner has been alerted.",
     };
     setStatus(labels[status] || "Call ended.");
   }
@@ -219,20 +220,43 @@
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       if (data.transcript) addBubble("caller", data.transcript);
-      addBubble("assistant", data.reply_text);
-      setStatus("Receptionist is speaking…");
-      await play(data.audio_b64, data.reply_text);
-      if (data.status === "collecting") {
-        talkBtn.disabled = false;
-        setStatus("Your turn: hold the button and speak.");
-      } else {
-        endCall(data.status);
-      }
+      await handleReply(data);
     } catch (err) {
       talkBtn.disabled = false;
       setStatus(`Something went wrong (${err.message}). Please try again.`, { error: true });
     } finally {
       busy = false;
+    }
+  }
+
+  // Speaks a reply, then either hands the turn back, waits for the owner, or ends the call
+  async function handleReply(data) {
+    addBubble("assistant", data.reply_text);
+    setStatus("Receptionist is speaking…");
+    await play(data.audio_b64, data.reply_text);
+    if (data.status === "collecting") {
+      talkBtn.disabled = false;
+      setStatus("Your turn: hold the button and speak.");
+    } else if (data.status === "waiting_human") {
+      await waitForOwner();
+    } else {
+      endCall(data.status);
+    }
+  }
+
+  // The AI asked the owner: poll until the owner answers (or the server times out)
+  async function waitForOwner() {
+    talkBtn.disabled = true;
+    setStatus(`Checking with ${ownerName}…`, { spinning: true });
+    while (true) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const res = await fetch(`/api/calls/${callId}/status`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data.reply_text) return handleReply(data);
+        if (data.status !== "waiting_human") return endCall(data.status);
+      } catch (_) { /* network blip: keep polling */ }
     }
   }
 
@@ -255,6 +279,7 @@
     document.getElementById("biz-name").textContent = info.name;
     document.getElementById("biz-tagline").textContent = info.tagline || "AI receptionist";
     document.title = `${info.name} · Talkse`;
+    if (info.owner) ownerName = info.owner;
   }).catch(() => {});
 
   if (!navigator.mediaDevices || !window.MediaRecorder) {

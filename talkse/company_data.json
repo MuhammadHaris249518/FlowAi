@@ -1,0 +1,323 @@
+{
+  "metadata": {
+    "purpose": "FICTIONAL demo data for the Talkse voice receptionist (Agentika 2.0). Not a real business.",
+    "dataset_version": "3.0.0",
+    "last_updated": "2026-10-17",
+    "notes": [
+      "Same top-level keys as clinic_data.json so clinic_config.py works unchanged.",
+      "price_usd is the visit/diagnostic price; estimated_deal_usd is the typical job value FlowCRM shows on the pipeline card.",
+      "approval_required services, estimates over the limit, commercial sites and areas outside the service area go to the owner first.",
+      "Phone numbers use the reserved 555-01XX fictional range."
+    ]
+  },
+  "clinic": {
+    "id": "company_coolbreeze_001",
+    "name": "Cool Breeze Home Services",
+    "tagline": "AC repair, plumbing and electrical across the Austin area",
+    "phone": "+1-512-555-0160",
+    "after_hours_emergency_line": "+1-512-555-0161",
+    "email": "hello@coolbreeze.example",
+    "address": {
+      "line1": "2100 S Lamar Blvd, Suite 300",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78704",
+      "country": "US"
+    },
+    "timezone": "America/Chicago",
+    "currency": "USD",
+    "owner": {
+      "name": "Haris",
+      "title": "Owner"
+    },
+    "hours": {
+      "monday": { "open": "08:00", "close": "18:00" },
+      "tuesday": { "open": "08:00", "close": "18:00" },
+      "wednesday": { "open": "08:00", "close": "18:00" },
+      "thursday": { "open": "08:00", "close": "18:00" },
+      "friday": { "open": "08:00", "close": "18:00" },
+      "saturday": { "open": "09:00", "close": "15:00" },
+      "sunday": { "closed": true }
+    },
+    "service_area": [
+      "Austin", "Round Rock", "Cedar Park", "Pflugerville", "Georgetown", "Leander",
+      "Lakeway", "Bee Cave", "Kyle", "Buda", "Manor", "Hutto", "West Lake Hills", "Sunset Valley"
+    ],
+    "service_area_zip_prefixes": ["786", "787"],
+    "approval_rules": {
+      "estimate_over_usd": 1500,
+      "keywords": [
+        "office", "commercial", "restaurant", "warehouse", "store", "retail", "apartment complex",
+        "property management", "hotel", "school", "church", "multiple units", "whole building"
+      ]
+    },
+    "accepted_payment_methods": ["Credit or debit card", "Cash", "Check", "Zelle", "Financing for installs (approved credit)"],
+    "diagnostic_fee_usd": 89,
+    "cancellation_policy": {
+      "notice_required_hours": 2,
+      "notes": "Please cancel or reschedule at least 2 hours before the visit so we can reassign the technician."
+    },
+    "deposit_policy": {
+      "applies_to_services_priced_over_usd": 1500,
+      "deposit_amount_usd": 500,
+      "notes": "Installations require a deposit, credited to the final invoice."
+    }
+  },
+  "providers": [
+    {
+      "id": "tech_mike",
+      "name": "Mike Johnson",
+      "title": "Senior HVAC Technician",
+      "specialties": ["AC repair", "tune-ups", "refrigerant"],
+      "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    },
+    {
+      "id": "tech_carlos",
+      "name": "Carlos Rivera",
+      "title": "HVAC Installation Lead",
+      "specialties": ["AC and heat pump installation", "AC repair", "commercial HVAC", "estimates"],
+      "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    },
+    {
+      "id": "tech_tyler",
+      "name": "Tyler Brooks",
+      "title": "Licensed Plumber",
+      "specialties": ["leaks", "drains", "water heaters"],
+      "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    },
+    {
+      "id": "tech_jason",
+      "name": "Jason Lee",
+      "title": "Licensed Electrician",
+      "specialties": ["electrical repair", "panels", "outlets and lighting"],
+      "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    }
+  ],
+  "services": [
+    {
+      "id": "svc_ac_repair",
+      "name": "AC Repair",
+      "category": "hvac",
+      "description": "Diagnosis and repair for an AC that isn't cooling, won't turn on, is noisy or is leaking water.",
+      "duration_minutes": 60,
+      "price_usd": 89,
+      "estimated_deal_usd": 350,
+      "provider_ids": ["tech_mike", "tech_carlos"],
+      "approval_required": false,
+      "keywords": ["ac repair", "not cooling", "blowing warm", "warm air", "won't turn on", "not working", "noise", "ac", "air conditioner", "a/c", "hvac", "repair"]
+    },
+    {
+      "id": "svc_ac_tuneup",
+      "name": "AC Tune-Up",
+      "category": "hvac",
+      "description": "Seasonal maintenance: cleaning, filter change, refrigerant and electrical checks.",
+      "duration_minutes": 60,
+      "price_usd": 129,
+      "estimated_deal_usd": 129,
+      "provider_ids": ["tech_mike", "tech_carlos"],
+      "approval_required": false,
+      "keywords": ["tune-up", "tune up", "maintenance", "service", "cleaning", "check-up", "checkup", "inspection"]
+    },
+    {
+      "id": "svc_refrigerant",
+      "name": "Refrigerant Recharge",
+      "category": "hvac",
+      "description": "Leak check and refrigerant recharge.",
+      "duration_minutes": 60,
+      "price_usd": 250,
+      "estimated_deal_usd": 400,
+      "provider_ids": ["tech_mike"],
+      "approval_required": false,
+      "keywords": ["refrigerant", "freon", "recharge", "low on gas", "coolant"]
+    },
+    {
+      "id": "svc_ac_install",
+      "name": "AC Installation",
+      "category": "hvac",
+      "description": "Installation or replacement of a central AC or heat pump system.",
+      "duration_minutes": 240,
+      "price_usd": 4500,
+      "estimated_deal_usd": 6500,
+      "provider_ids": ["tech_carlos"],
+      "approval_required": true,
+      "keywords": ["installation", "install", "new ac", "new unit", "replace", "replacement", "new system", "heat pump"]
+    },
+    {
+      "id": "svc_site_visit",
+      "name": "Free Estimate Visit",
+      "category": "estimate",
+      "description": "A free on-site visit to measure and give an exact quote for installs and larger jobs.",
+      "duration_minutes": 45,
+      "price_usd": 0,
+      "estimated_deal_usd": 6500,
+      "provider_ids": ["tech_carlos"],
+      "approval_required": false,
+      "keywords": ["estimate", "quote", "site visit", "free estimate", "assessment"]
+    },
+    {
+      "id": "svc_water_heater",
+      "name": "Water Heater Repair",
+      "category": "plumbing",
+      "description": "Repair for gas or electric water heaters that aren't heating or are leaking.",
+      "duration_minutes": 60,
+      "price_usd": 150,
+      "estimated_deal_usd": 450,
+      "provider_ids": ["tech_tyler"],
+      "approval_required": false,
+      "keywords": ["water heater", "hot water", "no hot water", "tankless", "heater"]
+    },
+    {
+      "id": "svc_plumbing",
+      "name": "Plumbing Repair",
+      "category": "plumbing",
+      "description": "Leaking pipes and faucets, clogged drains, toilets and garbage disposals.",
+      "duration_minutes": 60,
+      "price_usd": 125,
+      "estimated_deal_usd": 350,
+      "provider_ids": ["tech_tyler"],
+      "approval_required": false,
+      "keywords": ["plumbing", "plumber", "leak", "leaking", "pipe", "faucet", "drain", "clog", "clogged", "toilet", "disposal"]
+    },
+    {
+      "id": "svc_electrical",
+      "name": "Electrical Repair",
+      "category": "electrical",
+      "description": "Outlets, switches, breakers, lighting and panel troubleshooting.",
+      "duration_minutes": 90,
+      "price_usd": 125,
+      "estimated_deal_usd": 400,
+      "provider_ids": ["tech_jason"],
+      "approval_required": false,
+      "keywords": ["electrical", "electrician", "electric", "outlet", "switch", "breaker", "panel", "lights", "wiring"]
+    },
+    {
+      "id": "svc_commercial",
+      "name": "Commercial Service",
+      "category": "commercial",
+      "description": "HVAC, plumbing or electrical work for offices, stores, restaurants and other commercial sites.",
+      "duration_minutes": 120,
+      "price_usd": 500,
+      "estimated_deal_usd": 5000,
+      "provider_ids": ["tech_carlos"],
+      "approval_required": true,
+      "keywords": ["commercial", "office", "restaurant", "store", "warehouse", "business"]
+    }
+  ],
+  "faq": [
+    {
+      "id": "faq_001",
+      "category": "hours",
+      "question": "What are your hours?",
+      "answer": "We're open Monday to Friday from 8 AM to 6 PM, and Saturday from 9 AM to 3 PM. We're closed on Sundays.",
+      "keywords": ["hours", "open", "close", "when", "sunday", "weekend"]
+    },
+    {
+      "id": "faq_002",
+      "category": "pricing",
+      "question": "How much is a service call?",
+      "answer": "Our diagnostic visit is $89, and we waive it if you go ahead with the repair.",
+      "keywords": ["service call", "diagnostic", "trip charge", "visit fee", "how much to come out"]
+    },
+    {
+      "id": "faq_003",
+      "category": "area",
+      "question": "What areas do you serve?",
+      "answer": "We serve Austin and nearby cities, including Round Rock, Cedar Park, Pflugerville, Georgetown, Leander, Lakeway, Bee Cave, Kyle and Buda.",
+      "keywords": ["area", "areas", "serve", "service area", "come to", "cities"]
+    },
+    {
+      "id": "faq_004",
+      "category": "warranty",
+      "question": "Do you offer a warranty?",
+      "answer": "Yes. Repairs come with a 1-year parts and labor warranty, and new installations come with a 10-year manufacturer parts warranty plus our 2-year labor warranty.",
+      "keywords": ["warranty", "guarantee"]
+    },
+    {
+      "id": "faq_005",
+      "category": "payment",
+      "question": "How can I pay?",
+      "answer": "We accept credit and debit cards, cash, check and Zelle. Financing is available for new installations.",
+      "keywords": ["pay", "payment", "card", "cash", "check", "zelle", "financing"]
+    },
+    {
+      "id": "faq_006",
+      "category": "pricing",
+      "question": "How much does a tune-up cost?",
+      "answer": "An AC tune-up is $129 per system.",
+      "keywords": ["tune-up price", "tune up cost", "maintenance cost"]
+    },
+    {
+      "id": "faq_007",
+      "category": "pricing",
+      "question": "How much does a new AC cost?",
+      "answer": "A new AC system usually runs between $4,500 and $9,000 depending on size and efficiency. We start with a free estimate visit, and Haris confirms every install quote personally.",
+      "keywords": ["new ac cost", "installation cost", "replacement cost", "new system price"]
+    },
+    {
+      "id": "faq_008",
+      "category": "timing",
+      "question": "How soon can a technician come?",
+      "answer": "Usually the same day or the next business day, depending on your area and our schedule.",
+      "keywords": ["how soon", "same day", "today", "how fast", "quickly"]
+    },
+    {
+      "id": "faq_009",
+      "category": "emergency",
+      "question": "Do you offer emergency service?",
+      "answer": "Yes, for urgent breakdowns we try to get someone out the same day. If you smell gas or see sparks or smoke, leave the house and call 911 first.",
+      "keywords": ["emergency", "urgent", "after hours"]
+    },
+    {
+      "id": "faq_010",
+      "category": "brands",
+      "question": "Which brands do you work on?",
+      "answer": "We service all major brands, including Carrier, Trane, Lennox, Goodman, Rheem and Daikin.",
+      "keywords": ["brand", "brands", "carrier", "trane", "lennox", "goodman", "rheem", "daikin"]
+    },
+    {
+      "id": "faq_011",
+      "category": "licensing",
+      "question": "Are you licensed and insured?",
+      "answer": "Yes, our technicians are licensed in Texas and we're fully insured.",
+      "keywords": ["licensed", "license", "insured", "insurance", "certified"]
+    },
+    {
+      "id": "faq_012",
+      "category": "cancellation",
+      "question": "Can I cancel or reschedule?",
+      "answer": "Of course. Please let us know at least 2 hours before your visit so we can reassign the technician.",
+      "keywords": ["cancel", "reschedule", "change", "postpone"]
+    },
+    {
+      "id": "faq_013",
+      "category": "maintenance",
+      "question": "Do you have a maintenance plan?",
+      "answer": "Yes. Our Comfort Club plan is $15 a month and includes two tune-ups a year, priority scheduling and 15% off repairs.",
+      "keywords": ["maintenance plan", "membership", "club", "plan", "subscription"]
+    },
+    {
+      "id": "faq_014",
+      "category": "commercial",
+      "question": "Do you do commercial work?",
+      "answer": "Yes, we work with offices, stores and restaurants. Haris reviews every commercial job personally.",
+      "keywords": ["commercial", "business", "office", "restaurant"]
+    },
+    {
+      "id": "faq_015",
+      "category": "services",
+      "question": "What services do you offer?",
+      "answer": "AC repair, tune-ups and installation, water heater repair, plumbing repairs, and electrical repairs.",
+      "keywords": ["services", "what do you do", "offer", "provide"]
+    }
+  ],
+  "emergency_protocol": {
+    "keywords": [
+      "gas smell", "smell gas", "smells like gas", "smell of gas", "gas leak", "gas leaking",
+      "carbon monoxide", "co alarm", "co detector",
+      "sparking", "sparks", "smoke", "smoking", "burning smell", "something burning", "electrical fire", "on fire",
+      "electric shock", "got shocked", "water on the panel", "water in the panel"
+    ],
+    "caller_instructions": "This could be dangerous. Please leave the house now and don't touch any light switches or appliances. Once you're outside, call 911 or your gas company's emergency line. I'm alerting Haris right now so we can follow up with you.",
+    "response_time_sla": "Owner calls back within 15 minutes for safety calls."
+  }
+}

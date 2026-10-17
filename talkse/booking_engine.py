@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from datetime import datetime, timedelta, time as dt_time
 from dateutil import parser
@@ -7,21 +8,68 @@ import clinic_config as config
 import db
 
 def check_emergency_protocol(text: str) -> str | None:
-    """Checks transcript for emergency keywords. Returns emergency guidance if triggered."""
+    """Checks transcript for urgent/emergency keywords. Returns the caller guidance if triggered.
+
+    Keywords and guidance come from the data file's emergency_protocol; the medspa
+    list below is the fallback for clinic_data.json.
+    """
     if not text:
         return None
     lower = text.lower()
-    emergency_keywords = [
+    emergency_keywords = config.EMERGENCY_PROTOCOL.get("keywords") or [
         "difficulty breathing", "can't breathe", "cannot breathe",
         "severe swelling", "swelling up", "chest pain",
         "anaphylaxis", "allergic reaction"
     ]
     for kw in emergency_keywords:
         if kw in lower:
-            return config.EMERGENCY_PROTOCOL.get(
-                "life_threatening_instructions",
-                "If you are experiencing a medical emergency such as difficulty breathing, severe swelling, or chest pain, please call 911 immediately."
+            return (
+                config.EMERGENCY_PROTOCOL.get("caller_instructions")
+                or config.EMERGENCY_PROTOCOL.get(
+                    "life_threatening_instructions",
+                    "If you are experiencing a medical emergency such as difficulty breathing, severe swelling, or chest pain, please call 911 immediately."
+                )
             )
+    return None
+
+def is_in_service_area(area: str | None) -> bool:
+    """True if the caller's city/ZIP is in the data file's service area (unknown area counts as inside)."""
+    if not area or not config.CLINIC.get("service_area"):
+        return True
+    lower = area.lower()
+    if any(city.lower() in lower or lower in city.lower() for city in config.CLINIC["service_area"]):
+        return True
+    zip_match = re.search(r"\b(\d{5})\b", area)
+    prefixes = config.CLINIC.get("service_area_zip_prefixes", [])
+    return bool(zip_match and any(zip_match.group(1).startswith(p) for p in prefixes))
+
+
+def check_owner_approval(service: dict | None, transcript: str, area: str | None = None) -> str | None:
+    """Returns why this request needs the owner's decision, or None.
+
+    Uses the data file's approval_rules: approval_required services, estimates over the
+    limit, commercial keywords, and areas outside the service area. Without
+    approval_rules (clinic_data.json) it falls back to the original medspa
+    contraindication check.
+    """
+    rules = config.CLINIC.get("approval_rules")
+    if not rules:
+        return check_contraindications(service, transcript) if service else None
+
+    if service and service.get("approval_required"):
+        return f"every {service['name']} job is quoted by {config.OWNER_NAME} personally"
+
+    threshold = rules.get("estimate_over_usd")
+    if service and threshold is not None and service.get("price_usd", 0) > threshold:
+        return f"{service['name']} is above our ${threshold:,} approval limit"
+
+    lower = (transcript or "").lower()
+    for kw in rules.get("keywords", []):
+        if kw in lower:
+            return f"it sounds like a {kw} job, and {config.OWNER_NAME} reviews those personally"
+
+    if not is_in_service_area(area):
+        return f"{area} is outside our usual service area"
     return None
 
 def check_contraindications(service: dict, transcript_or_state: str | dict) -> str | None:
@@ -53,23 +101,30 @@ def check_contraindications(service: dict, transcript_or_state: str | dict) -> s
     return None
 
 def parse_time_string(time_str: str) -> datetime | None:
-    """Helper to parse fuzzy relative or explicit time strings into a future datetime."""
+    """Parses fuzzy times ("Thursday at 4 PM", "tomorrow 10am") into a future, business-local datetime."""
     if not time_str:
         return None
+    now = config.now()
+    # dateutil ignores "tomorrow", so start from tomorrow's date; it fills missing parts from `default`
+    base = now + timedelta(days=1) if "tomorrow" in time_str.lower() else now
+    default = base.replace(hour=10, minute=0, second=0, microsecond=0, tzinfo=None)
     try:
-        dt = parser.parse(time_str, fuzzy=True)
-        now = datetime.now()
-        # If parsed time is in the past, adjust day/year to future
-        if dt < now:
-            if dt.time() > now.time() and dt.date() < now.date():
-                dt = dt.replace(year=now.year, month=now.month, day=now.day)
-            if dt < now:
-                dt = dt + timedelta(days=1)
-        return dt
+        dt = parser.parse(time_str, fuzzy=True, default=default)
     except Exception:
-        # Fallback default: Tomorrow at 14:00 if unparseable
-        now = datetime.now()
-        return (now + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0)
+        # Unparseable: tomorrow at 14:00
+        dt = (now + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0, tzinfo=None)
+    dt = dt.replace(tzinfo=config.TZ)
+
+    # Move times in the past into the future
+    if dt < now:
+        names_weekday = any(day in time_str.lower() for day in
+                            ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"))
+        if dt.date() < now.date() or names_weekday:
+            while dt < now:
+                dt += timedelta(days=7)  # "Friday" said on a Friday evening -> next Friday
+        else:
+            dt += timedelta(days=1)  # earlier today, no weekday named -> same time tomorrow
+    return dt
 
 def is_slot_available(provider_id: str, service_id: str, requested_start: datetime, exclude_appt_id: str = None) -> tuple[bool, str]:
     """Checks clinic hours, provider working days, service offering, and existing appointments."""
@@ -92,7 +147,7 @@ def is_slot_available(provider_id: str, service_id: str, requested_start: dateti
         
     # 3. Check clinic hours
     if not config.is_clinic_open(requested_start):
-        return False, f"The clinic is closed on {requested_start.strftime('%A')} at {requested_start.strftime('%I:%M %p')}."
+        return False, f"We're closed on {requested_start.strftime('%A')} at {requested_start.strftime('%I:%M %p').lstrip('0')}."
         
     duration = svc.get("duration_minutes", 30)
     scheduled_end = requested_start + timedelta(minutes=duration)
@@ -106,22 +161,20 @@ def is_slot_available(provider_id: str, service_id: str, requested_start: dateti
 
 def book_appointment(state: dict, idempotency_key: str) -> dict:
     """Executes booking logic against clinic data and Postgres."""
-    # 1. Resolve service
-    svc_input = state.get("service") or "botox"
-    service = config.get_service(svc_input)
-    if not service:
-        service = config.get_service("svc_botox_touchup")
-        
-    # 2. Safety / Contraindication check
-    contra_reason = check_contraindications(service, state)
-    if contra_reason:
-        return {
-            "status": "rejected",
-            "reason": contra_reason,
-            "requires_human": True
-        }
-        
-    # 3. Resolve provider
+    # 1. Resolve service (fall back to the first service, e.g. the free discovery call)
+    service = config.get_service(state.get("service") or "") or config.SERVICES[0]
+
+    # 2. Owner-approval / safety check, skipped once the owner has approved this call
+    if not state.get("owner_approved"):
+        approval_reason = check_owner_approval(service, json.dumps(state, default=str), state.get("area"))
+        if approval_reason:
+            return {
+                "status": "rejected",
+                "reason": approval_reason,
+                "requires_human": True
+            }
+
+    # 3. Resolve providers
     valid_providers = config.providers_for_service(service["id"])
     if not valid_providers:
         return {
@@ -129,35 +182,37 @@ def book_appointment(state: dict, idempotency_key: str) -> dict:
             "reason": f"No providers available for {service['name']}.",
             "requires_human": True
         }
-        
-    # Pick requested provider or first available
-    provider = valid_providers[0]
-    
+
     # 4. Resolve requested time
     time_input = state.get("preferred_time") or "tomorrow at 2pm"
     requested_start = parse_time_string(time_input)
-    
-    # Ensure requested start falls on a valid provider day
-    if not config.provider_works_on(provider["id"], requested_start):
-        # Find next valid working day for provider
-        for offset in range(1, 8):
-            test_dt = requested_start + timedelta(days=offset)
-            if config.provider_works_on(provider["id"], test_dt) and config.is_clinic_open(test_dt):
-                requested_start = test_dt
-                break
 
-    # 5. Check availability
+    # 5. First provider free at exactly that time; otherwise the original rule:
+    #    first provider, moved to their next working day
+    provider = next(
+        (p for p in valid_providers if is_slot_available(p["id"], service["id"], requested_start)[0]),
+        None,
+    )
+    if provider is None:
+        provider = valid_providers[0]
+        if not config.provider_works_on(provider["id"], requested_start):
+            for offset in range(1, 8):
+                test_dt = requested_start + timedelta(days=offset)
+                if config.provider_works_on(provider["id"], test_dt) and config.is_clinic_open(test_dt):
+                    requested_start = test_dt
+                    break
+
     available, reason = is_slot_available(provider["id"], service["id"], requested_start)
     if not available:
         return {
             "status": "rejected",
             "reason": reason
         }
-        
+
     duration = service.get("duration_minutes", 30)
     scheduled_end = requested_start + timedelta(minutes=duration)
-    
-    # 6. Deposit requirement rule from clinic_data.json
+
+    # 6. Deposit requirement rule from the data file
     deposit_threshold = config.CLINIC.get("deposit_policy", {}).get("applies_to_services_priced_over_usd", 200)
     service_price = service.get("price_usd", 0)
     deposit_required = service_price >= deposit_threshold
@@ -182,7 +237,7 @@ def book_appointment(state: dict, idempotency_key: str) -> dict:
         "provider_name": provider["name"],
         "scheduled_start": requested_start.strftime("%A, %b %d at %I:%M %p"),
         "deposit_required": deposit_required,
-        "message": f"Successfully booked {service['name']} with {provider['name']} for {requested_start.strftime('%A, %b %d at %I:%M %p')}."
+        "message": f"You're all set: {service['name']} with {provider['name']} on {requested_start.strftime('%A, %B %d at %I:%M %p').replace(' 0', ' ')}."
     }
 
 def reschedule_appointment(existing_ref: str, new_time_str: str) -> dict:
@@ -216,7 +271,7 @@ def reschedule_appointment(existing_ref: str, new_time_str: str) -> dict:
     
     notice_warning = ""
     if hours_until_appt < notice_hours:
-        notice_warning = f" (Note: Less than {notice_hours} hours notice given; deposit may be forfeited per clinic policy)."
+        notice_warning = f" (Note: Less than {notice_hours} hours notice given; deposit may be forfeited per our policy)."
         
     updated = db.update_appointment_time(appt["id"], new_start, new_end)
     

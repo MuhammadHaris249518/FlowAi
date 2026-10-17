@@ -42,7 +42,7 @@ def merge_state(current_state: dict, new_extracted: dict) -> dict:
     if new_intent in ("book", "reschedule", "cancel") and current_state.get("intent") in (None, "unclear"):
         current_state["intent"] = new_intent
 
-    for field in ("service", "preferred_time", "caller_name", "existing_appointment_ref"):
+    for field in ("service", "issue", "area", "preferred_time", "caller_name", "existing_appointment_ref"):
         val = new_extracted.get(field)
         if val is not None and str(val).strip() != "" and str(val).lower() != "null":
             current_state[field] = val
@@ -54,28 +54,41 @@ def extract_intent(transcript: str) -> tuple[dict, float]:
     start_time = time.perf_counter()
 
     system_prompt = (
-        "You are an AI receptionist extracting structured conversation details from a transcript.\n"
+        "You are an AI receptionist extracting structured conversation details from one caller turn.\n"
         "Return ONLY a JSON object matching this exact schema with no extra text or markdown formatting:\n"
         "{\n"
-        '  "intent": "book" | "reschedule" | "cancel" | "unclear",\n'
+        '  "intent": "book" | "reschedule" | "cancel" | "question" | "unclear",\n'
         '  "service": null,\n'
         '  "preferred_time": null,\n'
+        '  "issue": null,\n'
+        '  "area": null,\n'
         '  "caller_name": null,\n'
         '  "existing_appointment_ref": null,\n'
+        '  "question": null,\n'
         '  "confidence": 0.0\n'
         "}\n"
         "Rules:\n"
-        "- Set 'intent' to 'book', 'reschedule', 'cancel', or 'unclear'.\n"
+        "- 'book': wants a technician visit, repair, installation, estimate or appointment, OR describes a problem\n"
+        "  that needs one (e.g. 'my AC stopped working', 'my sink is leaking'). 'question': asks for\n"
+        "  information (prices, hours, areas, warranty, how something works) without asking to book in this turn.\n"
+        "- 'service': the kind of job in a few words (e.g. 'AC repair', 'water heater', 'new AC installation').\n"
+        "- 'issue': the problem as described (e.g. 'AC blowing warm air', 'kitchen sink leaking').\n"
+        "- 'area': the city, neighborhood or ZIP code where the job is (e.g. 'Round Rock', '78704').\n"
+        "- 'preferred_time': the day and time exactly as said (e.g. 'Tuesday at 2 PM', 'tomorrow morning').\n"
+        "- 'question': the caller's question rephrased as one short sentence, only when they asked one.\n"
         "- ONLY fill in fields the caller explicitly stated in this transcript turn.\n"
         "- Leave unstated fields as null (do NOT invent or guess values)."
     )
-    
+
     fallback = {
         "intent": "unclear",
         "service": None,
         "preferred_time": None,
+        "issue": None,
+        "area": None,
         "caller_name": None,
         "existing_appointment_ref": None,
+        "question": None,
         "confidence": 0.0
     }
 

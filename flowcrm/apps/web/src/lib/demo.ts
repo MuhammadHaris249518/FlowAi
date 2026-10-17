@@ -3,4 +3,4 @@
 // Unset it (and rebuild) to restore normal Clerk auth.
 export const DEMO_MODE = process.env.NEXT_PUBLIC_AUTH_MODE === "demo";
 
-export const DEMO_USER = { name: "Ahmed", role: "Owner", initials: "A" };
+export const DEMO_USER = { name: "Haris", role: "Owner", initials: "H" };

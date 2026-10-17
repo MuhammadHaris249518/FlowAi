@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Owner Console</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #667085; --border: #e4e7ec;
+    --accent: #1565c0; --accent-text: #ffffff; --good: #2e7d32; --warn: #b26a00; --danger: #c62828;
+    --chip: #eef2f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --card: #171a21; --text: #eceef2; --muted: #98a2b3; --border: #2a2f3a;
+      --accent: #4c8dff; --accent-text: #0f1115; --good: #66bb6a; --warn: #ffb74d; --danger: #ef5350;
+      --chip: #22262f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 21px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .card.pending { border-left: 4px solid var(--accent); }
+  .card.hazard { border-left: 4px solid var(--danger); }
+  .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+  .chip.approval { color: var(--accent); }
+  .chip.question { color: var(--warn); }
+  .chip.hazard { color: var(--danger); }
+  .summary { margin: 8px 0 10px; white-space: pre-wrap; }
+  .countdown { font-size: 13px; color: var(--muted); }
+  .countdown.late { color: var(--danger); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  textarea { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 64px; margin-bottom: 8px; }
+  label.faq { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .done { color: var(--muted); font-size: 13px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .error { color: var(--danger); font-size: 13px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1 id="title">Owner Console</h1>
+      <div class="sub" id="subtitle">The AI asks you here when it shouldn't decide alone.</div>
+    </div>
+    <div class="sub" id="channels"></div>
+  </header>
+
+  <h2>Safety alerts</h2>
+  <div id="hazards"><div class="empty">No safety alerts.</div></div>
+
+  <h2>Waiting for you</h2>
+  <div id="pending"><div class="empty">Nothing waiting. New requests appear here automatically.</div></div>
+
+  <h2>Recent decisions</h2>
+  <div id="recent"><div class="empty">No decisions yet.</div></div>
+</main>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const KEY = params.get("key");
+  const withKey = path => KEY ? `${path}${path.includes("?") ? "&" : "?"}key=${encodeURIComponent(KEY)}` : path;
+  let timeoutSeconds = 45;
+  let drafts = {};          // keep typed answers across refreshes
+  let lastRender = "";
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+
+  function ago(iso) {
+    const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
+    return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : new Date(iso).toLocaleString();
+  }
+
+  function pendingCard(e) {
+    const left = Math.round(timeoutSeconds - (Date.now() - new Date(e.created_at)) / 1000);
+    const countdown = left > 0
+      ? `<span class="countdown">Caller on hold · ${left}s left</span>`
+      : `<span class="countdown late">Time's up: the AI promised a callback</span>`;
+    const options = e.options.map(o =>
+      `<button class="${o.id === "approve" ? "primary" : ""}" data-id="${e.id}" data-choice="${o.id}">${esc(o.label)}</button>`
+    ).join("");
+    const questionBox = e.kind === "question" ? `
+      <textarea data-draft="${e.id}" placeholder="Type the answer the AI should say to the caller…">${esc(drafts[e.id] || "")}</textarea>
+      <label class="faq"><input type="checkbox" data-faq="${e.id}" checked> Save as FAQ so the AI answers this itself next time</label>
+      <div class="actions"><button class="primary" data-id="${e.id}" data-send="1">Send answer</button>${options}</div>`
+      : `<div class="actions">${options}</div>`;
+    return `<div class="card pending">
+      <div class="row"><span class="chip ${e.kind}">${e.kind === "approval" ? "Needs approval" : "Caller question"}</span>${countdown}</div>
+      <div class="summary">${esc(e.summary)}</div>
+      ${questionBox}
+      <div class="error" data-error="${e.id}"></div>
+    </div>`;
+  }
+
+  function hazardCard(e) {
+    const ack = e.status === "alerted"
+      ? `<button data-ack="${e.id}">Acknowledge</button>` : `<span class="done">Acknowledged</span>`;
+    return `<div class="card hazard">
+      <div class="row"><span class="chip hazard">Safety</span><span class="sub">${ago(e.created_at)}</span></div>
+      <div class="summary">${esc(e.summary)}</div>${ack}</div>`;
+  }
+
+  function recentCard(e) {
+    const labels = { approve: "Approved", site_visit: "Free estimate visit first", callback: "Will call back" };
+    const outcome = e.status === "timed_out" ? "No answer in time (callback promised)"
+      : labels[e.answer] || `Answered: "${e.answer}"`;
+    return `<div class="card"><div class="row"><span class="chip ${e.kind}">${e.kind}</span><span class="sub">${ago(e.created_at)}</span></div>
+      <div class="summary">${esc(e.summary)}</div><div class="done">${esc(outcome)}</div></div>`;
+  }
+
+  async function load() {
+    try {
+      const res = await fetch(withKey("/api/owner/escalations"));
+      if (res.status === 401) { document.getElementById("subtitle").textContent = "Owner key required: open this page with ?key=..."; return; }
+      const data = await res.json();
+      timeoutSeconds = data.timeout_seconds;
+      document.getElementById("title").textContent = `${data.business} · Owner Console`;
+      document.getElementById("subtitle").textContent = `Hi ${data.owner}, the AI asks you here when it shouldn't decide alone.`;
+      document.getElementById("channels").textContent = `Notifications: ${data.channels.join(", ")}`;
+
+      const list = data.escalations;
+      const pending = list.filter(e => e.status === "pending" && e.kind !== "hazard");
+      const hazards = list.filter(e => e.kind === "hazard").slice(0, 5);
+      const recent = list.filter(e => ["answered", "spoken", "timed_out"].includes(e.status)).slice(0, 8);
+
+      // Don't re-render while the owner is typing in a box
+      const typing = document.activeElement && document.activeElement.tagName === "TEXTAREA";
+      const html = JSON.stringify(list) + Math.floor(Date.now() / 1000);
+      if (typing || html === lastRender) return;
+      lastRender = html;
+
+      document.getElementById("pending").innerHTML = pending.length ? pending.map(pendingCard).join("")
+        : `<div class="empty">Nothing waiting. New requests appear here automatically.</div>`;
+      document.getElementById("hazards").innerHTML = hazards.length ? hazards.map(hazardCard).join("")
+        : `<div class="empty">No safety alerts.</div>`;
+      document.getElementById("recent").innerHTML = recent.length ? recent.map(recentCard).join("")
+        : `<div class="empty">No decisions yet.</div>`;
+    } catch (_) { /* keep the last view on network blips */ }
+  }
+
+  async function answer(id, body) {
+    const err = document.querySelector(`[data-error="${id}"]`);
+    try {
+      const res = await fetch(withKey(`/api/owner/escalations/${id}/answer`), {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (!res.ok) { const d = await res.json(); if (err) err.textContent = d.detail || "Could not send"; return; }
+      delete drafts[id];
+      lastRender = "";
+      load();
+    } catch (e) { if (err) err.textContent = e.message; }
+  }
+
+  document.addEventListener("input", e => { if (e.target.dataset.draft) drafts[e.target.dataset.draft] = e.target.value; });
+  document.addEventListener("click", async e => {
+    const t = e.target;
+    if (t.dataset.choice) { t.disabled = true; return answer(t.dataset.id, { choice: t.dataset.choice }); }
+    if (t.dataset.send) {
+      const id = t.dataset.id;
+      const text = (drafts[id] || "").trim();
+      if (!text) { document.querySelector(`[data-error="${id}"]`).textContent = "Type an answer first."; return; }
+      const saveFaq = document.querySelector(`[data-faq="${id}"]`)?.checked ?? false;
+      t.disabled = true;
+      return answer(id, { text, save_as_faq: saveFaq });
+    }
+    if (t.dataset.ack) {
+      await fetch(withKey(`/api/owner/escalations/${t.dataset.ack}/ack`), { method: "POST" });
+      lastRender = ""; load();
+    }
+  });
+
+  load();
+  setInterval(load, 3000);
+</script>
+</body>
+</html>

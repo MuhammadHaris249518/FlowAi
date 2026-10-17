@@ -1,10 +1,12 @@
 import os
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from dateutil import parser
 
-# DATA_FILE lets us swap the business (clinic_data.json -> company_data.json) without code changes
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), os.getenv("DATA_FILE", "clinic_data.json"))
+# DATA_FILE lets us swap the business without code changes. Default: the demo
+# company (Talkse Growth Partners); clinic_data.json is the original medspa data.
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), os.getenv("DATA_FILE", "company_data.json"))
 if not os.path.exists(CONFIG_PATH):
     print(f"[Config] WARNING: {CONFIG_PATH} not found; falling back to clinic_data.json")
     CONFIG_PATH = os.path.join(os.path.dirname(__file__), "clinic_data.json")
@@ -15,7 +17,18 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
 CLINIC = CLINIC_DATA.get("clinic", {})
 PROVIDERS = CLINIC_DATA.get("providers", [])
 SERVICES = CLINIC_DATA.get("services", [])
+FAQ = CLINIC_DATA.get("faq", [])
 EMERGENCY_PROTOCOL = CLINIC_DATA.get("emergency_protocol", {})
+
+BUSINESS_NAME = CLINIC.get("name", "our office")
+OWNER_NAME = CLINIC.get("owner", {}).get("name", "the owner")
+# Business-local time: the container runs in UTC, but "Thursday at 4 PM" means the business's 4 PM
+TZ = ZoneInfo(CLINIC.get("timezone", "UTC"))
+
+
+def now() -> datetime:
+    """Current time in the business's time zone."""
+    return datetime.now(TZ)
 
 def get_service(service_id_or_name: str) -> dict | None:
     """Finds a service by ID or fuzzy matching against service name/category."""
@@ -39,7 +52,18 @@ def get_service(service_id_or_name: str) -> dict | None:
         if cat and (query == cat or query in cat):
             return svc
 
-    # 4. Keyword map with real valid IDs
+    # 4. Per-service "keywords" from the data file; longest first so "lead generation"
+    #    beats a generic word like "call"
+    data_keywords = sorted(
+        ((kw.lower(), svc) for svc in SERVICES for kw in svc.get("keywords", [])),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    )
+    for kw, svc in data_keywords:
+        if kw in query:
+            return svc
+
+    # 5. Original medspa keyword map (clinic_data.json)
     keywords = {
         "botox": "svc_botox_touchup",
         "consultation": "svc_consult",
@@ -50,10 +74,23 @@ def get_service(service_id_or_name: str) -> dict | None:
         "peel": "svc_peel"
     }
     for kw, default_id in keywords.items():
-        if kw in query:
+        if kw in query and any(s["id"] == default_id for s in SERVICES):
             return get_service(default_id)
-            
+
     return None
+
+
+def find_faq(text: str) -> dict | None:
+    """Best keyword match from the data file's FAQ, or None. Longer keyword hits score higher."""
+    if not text:
+        return None
+    lower = text.lower()
+    best, best_score = None, 0
+    for item in FAQ:
+        score = sum(len(kw) for kw in item.get("keywords", []) if kw.lower() in lower)
+        if score > best_score:
+            best, best_score = item, score
+    return best
 
 def get_provider(provider_id_or_name: str) -> dict | None:
     """Finds a provider by ID or fuzzy name match."""
