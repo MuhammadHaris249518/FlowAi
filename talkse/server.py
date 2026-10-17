@@ -5,6 +5,7 @@ calls are blocking, so FastAPI runs them in its thread pool.
 """
 
 import base64
+from html import escape as html_escape
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -13,13 +14,14 @@ from dotenv import load_dotenv
 
 load_dotenv()  # must run before clinic_config reads DATA_FILE
 
-from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 import call_engine
 import clinic_config
 import db
+import email_notify
 import handoff
 import mcp_server
 import notifier
@@ -183,6 +185,49 @@ def call_status(call_id: str) -> dict:
 @app.get("/owner")
 def owner_page() -> FileResponse:
     return FileResponse(os.path.join(STATIC_DIR, "owner.html"))
+
+
+def _act_page(title: str, body: str, color: str = "#0d9488") -> HTMLResponse:
+    return HTMLResponse(
+        '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'<title>{html_escape(title)}</title>'
+        '<body style="font-family:Arial,sans-serif;background:#f6f9fc;margin:0;padding:40px 16px">'
+        '<div style="max-width:440px;margin:auto;background:#fff;border-radius:18px;padding:28px;'
+        'box-shadow:0 10px 30px rgba(15,36,64,.08);text-align:center">'
+        f'<h2 style="color:{color};margin:0 0 10px">{html_escape(title)}</h2>{body}</div></body>')
+
+
+@app.get("/owner/act")
+def owner_act_confirm(id: str, choice: str, sig: str) -> HTMLResponse:
+    """Email approval link. Shows a one-tap confirm (a POST) so mail scanners that open links can't decide."""
+    if not email_notify.verify(id, choice, sig):
+        return _act_page("Link not valid", "<p>This approval link is invalid or expired.</p>", "#ef4444")
+    esc = db.get_escalation(id)
+    if not esc:
+        return _act_page("Request not found", "<p>This request no longer exists.</p>", "#ef4444")
+    if esc["status"] != "pending":
+        return _act_page("Already handled", f"<p>This request is <b>{html_escape(esc['status'])}</b>.</p>", "#64748b")
+    label = email_notify.BUTTON_LABELS.get(choice, choice)
+    summary = "<br>".join(html_escape(p) for p in esc["summary"].split(" | "))
+    return _act_page(
+        f"{label}?",
+        f'<p style="background:#f1f5f9;border-radius:12px;padding:12px;text-align:left;line-height:1.5">{summary}</p>'
+        f'<form method="post"><input type="hidden" name="id" value="{html_escape(id)}">'
+        f'<input type="hidden" name="choice" value="{html_escape(choice)}">'
+        f'<input type="hidden" name="sig" value="{html_escape(sig)}">'
+        f'<button style="background:#0d9488;color:#fff;border:0;border-radius:12px;padding:14px 24px;'
+        f'font-size:16px;font-weight:700;width:100%">Confirm: {html_escape(label)}</button></form>')
+
+
+@app.post("/owner/act")
+def owner_act(id: str = Form(...), choice: str = Form(...), sig: str = Form(...)) -> HTMLResponse:
+    if not email_notify.verify(id, choice, sig):
+        return _act_page("Link not valid", "<p>This approval link is invalid or expired.</p>", "#ef4444")
+    result = handoff.answer_escalation(id, choice=choice)
+    if not result["ok"]:
+        return _act_page("Not applied", f"<p>{html_escape(result.get('error', 'Could not apply'))}</p>", "#64748b")
+    return _act_page("Done", f"<p>The AI is telling the caller now: <b>"
+                             f"{html_escape(email_notify.BUTTON_LABELS.get(choice, choice))}</b>.</p>")
 
 
 @app.get("/api/owner/escalations")
