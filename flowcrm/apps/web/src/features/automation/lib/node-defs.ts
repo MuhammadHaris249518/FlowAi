@@ -21,7 +21,6 @@ export const triggerConfigSchema = z.object({
     "LEAD_SCORE_CHANGED",
     "DEAL_STAGE_CHANGED",
     "TASK_OVERDUE",
-    "ACTIVITY_LOGGED",
   ]),
 });
 

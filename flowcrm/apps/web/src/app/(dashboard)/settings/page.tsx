@@ -46,6 +46,10 @@ export default function SettingsPage() {
       <Topbar title="Settings & Configuration" />
 
       <main className="mx-auto max-w-7xl space-y-6 p-6 sm:p-8">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Demo workspace: settings here are read-only. The AI receptionist and integrations are configured on
+          the server (environment variables), so changes on this page aren&apos;t saved.
+        </div>
         {/* Header */}
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold text-ink-900">Workspace Settings</h1>

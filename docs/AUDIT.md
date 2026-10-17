@@ -3,6 +3,29 @@
 **Date:** 17 October 2026 · **Scope:** whole repo (`talkse/`, `flowcrm/`, `deploy/`, `scripts/`), including uncommitted MCP work
 **Method:** code review of every Talkse module and the FlowCRM files we changed, plus checks run against the code (keyword tests, dependency checks, test runs, live probes)
 
+## Status update (17 October, afternoon)
+
+| ID | Status | What changed |
+|---|---|---|
+| C1 | Fixed in code | FlowCRM image listens on port 80; applies on the next deploy (`deploy/flowcrm.cloud.env`) |
+| C2 | **Fixed** | `/mcp` requires `MCP_API_KEY` (401 without it); FlowCRM sends `TALKSE_MCP_KEY` |
+| C3 | **Fixed** | `owner_approved` removed; jobs needing approval create an owner request; booking needs Haris's approval for that exact job; the assistant can't answer approvals |
+| H1 | Fixed in config | `OWNER_CONSOLE_KEY` set in the Talkse cloud variables |
+| H2 | **Fixed** | Web callers are asked for a phone number (spoken digits understood, can decline); phone calls use caller ID; saved on the call, appointment and CRM contact |
+| H3 | Open | Rotate all shared keys after the event (now also Resend) |
+| H4 | Accepted | Demo mode only; never with real data |
+| H5 | **Fixed** | Per-IP rate limits: 20 new calls/hour, 120 turns/10 min |
+| H6 | **Fixed** | Background sweeper finalizes abandoned calls every minute (call-back task, CRM lead, Inbox notification) |
+| H7 | Partly fixed | 17 unit tests in `talkse/tests` (parsing, read-back, keywords, time) |
+| M1 | **Fixed** | Unparseable times are asked again, never guessed |
+| M2 | **Fixed** | Booking is read back and needs a "yes"; changes keep the parts not changed |
+| M3 | **Fixed** | Connection pool: ~2.5 s per phone turn (was 5–7 s) |
+| M7 / M8 | **Fixed** | Whole-word keyword matching; beeping smoke/CO detector isn't an emergency; "home office" / "at the store" aren't commercial |
+| M9 | Improved | Contacts now usually have a phone number to match on |
+| M10 | Improved | Talkse emits FlowCRM outbox events, so automation runs on its leads and bookings |
+| — | **Fixed** | `TASK_OVERDUE` trigger now fires (poller); `ACTIVITY_LOGGED` hidden (nothing emits it) |
+| M11, M12, L1–L10 | Open | After the event |
+
 ## Summary
 
 The product works end to end locally: voice booking, owner handoff (console + Telegram), safety alerts, FAQ learning, CRM sync, and the FlowCRM assistant over MCP. The biggest risks are not in the core logic but around it:

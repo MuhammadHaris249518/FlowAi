@@ -1,84 +1,70 @@
 # Talkse Live + FlowCRM: progress report
 
-**As of:** 17 October 2026, early morning PKT · **Deadline:** 12:45 PM PKT today (target 12:15 PM)
+**As of:** 17 October 2026, afternoon PKT · **Deadline:** 12:45 PM PKT today
 
-## Status: about 75% complete
+## Status: about 85% complete
 
-All features are built and tested locally. What remains is deploying the latest version, testing it live, and the submission work (video, screenshots, LinkedIn post, PDF).
+Everything is built, tested locally against the real database, and pushed. What remains depends on the
+platform: Alternate Clouds paused deployments for a fix ("stop deployments until I ping you"). After their
+ping: redeploy both services, point SignalWire at the new code, run the live test, then the submission work.
 
 | Area | Weight | Done | Contributes |
 |---|---|---|---|
-| Build: phases 1 to 8 | 70% | 100% | 70% |
-| Phase 9: final deploy and live testing | 15% | ~40% | 6% |
-| Phase 10: video, screenshots, LinkedIn, submission PDF | 15% | 0% | 0% |
-| **Total** | | | **~76%** |
+| Build: phases 1 to 8, plus phone calls, email alerts, automation, security fixes | 70% | 100% | 70% |
+| Phase 9: final deploy and live testing | 15% | ~60% (code ready, variables ready, platform paused) | 9% |
+| Phase 10: video, screenshots, LinkedIn, submission PDF | 15% | ~40% (video can be recorded locally) | 6% |
+| **Total** | | | **~85%** |
 
 ## Phases
 
 | # | Phase | Status | Notes |
 |---|---|---|---|
-| 1 | Setup and first deploy | Done | Deploy pipeline on Alternate Clouds verified, WebSockets work |
-| 2 | Database | Done | One Neon Postgres: FlowCRM in `public`, Talkse in `talkse`; demo data seeded (`seed_crm.py --reset`) |
-| 3 | Business data | Done | Cool Breeze Home Services, Austin TX (US); owner Haris; 9 services in USD, 4 technicians, service area, 15 FAQs, safety rules |
-| 4 | Browser voice call | Done | Hold-to-talk call page; one turn per request, state saved in Postgres |
-| 5 | FlowCRM demo mode | Done | Same FlowCRM UI without login, 5-second live refresh, single-container deploy, Voice Agent button |
-| 6 | Calls into FlowCRM | Done | Every call creates a contact, lead, deal (Meeting column), task and activity |
-| 7 | Human handoff | Done | Caller waits while the owner decides; owner console and Telegram bot with buttons; 45 s timeout falls back to a callback |
-| 8 | Safety and learning | Done | Gas/sparks/smoke alerts the owner instantly; owner answers can be saved as FAQs the AI uses next time |
-| 9 | Final deploy and testing | In progress | Everything tested locally; latest version not yet deployed |
-| 10 | Demo and submission | Not started | Video, screenshots, LinkedIn post, submission PDF |
+| 1 | Setup and first deploy | Done | Alternate Clouds pipeline verified |
+| 2 | Database | Done | One Neon Postgres: FlowCRM in `public`, Talkse in `talkse`; pooled connections |
+| 3 | Business data | Done | Cool Breeze Home Services, Austin TX; owner Haris; 9 services, 4 technicians, 15 FAQs, safety rules |
+| 4 | Voice calls | Done | Browser call page (new light design, voice orb) **and real phone calls** on +1 201 586 7069 (SignalWire) |
+| 5 | FlowCRM demo mode | Done | Same FlowCRM UI without login; Voice Agent button; Documents hidden |
+| 6 | Calls into FlowCRM | Done | Contact (with phone), lead, deal, task, activity, plus automation events and Inbox notifications |
+| 7 | Human handoff | Done | Caller on hold while Haris decides; **approval email** with signed one-tap links, owner console; 90 s timeout falls back to a callback |
+| 8 | Safety and learning | Done | Gas/sparks/smoke alerts (no false alarm for a beeping detector); owner answers saved as FAQs |
+| 9 | Final deploy and testing | Waiting on platform | Both deployments paused by the platform team; variable sheets in `deploy/*.cloud.env` |
+| 10 | Demo and submission | In progress | Record the video locally now; screenshots, LinkedIn post (team-written), PDF |
 
-## What works (tested end to end on the real database)
+## What works (tested on the real database)
 
 | Flow | Result |
 |---|---|
-| Normal booking ("my AC is blowing warm air") | Booked with a technician at the requested time; deal appears in the FlowCRM pipeline |
-| Owner approval (new AC install, commercial job, over $1,500, outside service area) | Caller on hold; owner taps Approve / Free estimate first / I'll call; AI continues the call |
-| Unknown question | AI asks the owner instead of guessing and speaks the owner's answer |
-| Learning | Owner taps Save as FAQ; the next caller gets the answer instantly, no owner needed |
-| Safety hazard ("I smell gas") | Immediate safety instructions, owner alert, HIGH task in FlowCRM |
-| Owner doesn't answer | Callback promised after 45 s, HIGH callback task in FlowCRM |
-| Problem described without "book" ("my sink is leaking") | Treated as a booking, service worked out from the problem |
-| Telegram bot | All flows pass in simulation (buttons, typed replies, Save as FAQ, alerts, strangers blocked) |
-
-## What was built at the event
-
-- **Talkse service** (Python, FastAPI): browser calls, conversation engine, human handoff, owner console, Telegram bot, FAQ learning, CRM sync, US business data, new call page with an animated voice orb.
-- **FlowCRM** (Next.js + Express): demo mode without login, live refresh, Voice Agent button and sidebar links, single-container Dockerfile.
-- **Deployment:** monorepo (`talkse/`, `flowcrm/`), `flowcrm-deploy` branch for the FlowCRM service, local launcher (`scripts/run_local.py`).
-
-Pre-existing code reused: the Talkse voice pipeline (speech-to-text, intent extraction, booking engine) and the FlowCRM app. Both are listed in the README.
+| Booking on the web ("my sink is leaking") | Asks city, time, name, **phone**, reads the booking back, books on "yes" |
+| Booking by phone (SignalWire) | Same flow; phone taken from caller ID; ~2.5 s per turn; slow turns never drop the call |
+| Changing details at the read-back ("make it 4 PM") | Keeps the day, re-reads, books the corrected time |
+| Unclear time ("sometime soon") | Asked again instead of guessed |
+| Owner approval (install, commercial, outside area) | Caller on hold; Haris gets an email with Approve / Site visit / Call back; caller hears the decision |
+| Unknown question | Haris answers in the owner console; can save it as an FAQ |
+| Safety hazard | Instant safety steps, urgent email, HIGH task |
+| Caller leaves mid-call (web or phone) | Within ~10 min: call-back task, CRM lead and Inbox notification |
+| FlowCRM automation | 3 live workflows: hot lead → task + alert; booking → AI confirmation email draft; big job → owner alert; overdue tasks trigger too |
+| FlowCRM Inbox | Real notifications from the AI receptionist and automation, plus AI drafts |
+| FlowCRM AI Assistant over MCP | Reads calls, checks availability, books routine jobs; **cannot approve jobs** (only Haris can) |
+| Security | `/mcp` needs a key; owner console key in production; approvals can't be bypassed; per-IP rate limits |
+| Unit tests | `python -m pytest talkse/tests` (17 tests) |
 
 ## Remaining work
 
 | # | Task | Owner | Time |
 |---|---|---|---|
-| 1 | Push `main` and `flowcrm-deploy` | Team | 2 min |
-| 2 | Talkse service: set variables, Rebuild, Deploy | Team | 10 min |
-| 3 | FlowCRM service: set `PORT=80`, `DEMO_CLERK_ID=demo_haris`, Rebuild, Deploy | Team | 15 min |
-| 4 | Get the owner's Telegram chat ID (send /start to the bot after deploy) and set it | Team | 5 min |
-| 5 | Live test on a phone: booking, approval, Save as FAQ, safety call | Team + Claude | 20 min |
-| 6 | Record the 2 to 3 minute demo video | Team | 30 min |
-| 7 | Screenshots: both teammates in Discord, Alternate Clouds dashboard with both services | Team | 10 min |
-| 8 | LinkedIn post (must be written by the team, not AI) and teammate reshare | Team | 20 min |
-| 9 | Submission PDF (sections 1 to 5 of the handbook) | Team | 30 min |
-
-**Estimated remaining time:** about 2.5 hours, plus buffer for deploy retries.
-
-## Deployment checklist
-
-**Talkse service** (branch `main`, root directory `.`, port 8000). Variables:
-`DATABASE_URL`, `GROQ_API_KEY`, `DEEPGRAM_API_KEY`, `CRM_ORG_ID=org_coolbreeze`, `CRM_OWNER_USER_ID=usr_haris`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_CHAT_ID`, `PUBLIC_BASE_URL` (its own URL), `FLOWCRM_URL` (the FlowCRM URL).
-
-**FlowCRM service** (branch `flowcrm-deploy`, port 80). Variables:
-`DATABASE_URL` (without `channel_binding`), `DIRECT_URL`, `AUTH_MODE=demo`, `DEMO_CLERK_ID=demo_haris`, `DEMO_ORG_ID=org_coolbreeze`, `PORT=80`.
+| 1 | Wait for the platform team's ping | Team | — |
+| 2 | Talkse: paste `deploy/talkse.cloud.env` into Variables, Ports 8000, Redeploy | Team | 5 min |
+| 3 | FlowCRM: paste `deploy/flowcrm.cloud.env` into Variables, Ports 80, Redeploy | Team | 5 min |
+| 4 | SignalWire: handler `talkse-webhook-cxml` → `<Talkse URL>/voice/incoming` (POST) | Team | 2 min |
+| 5 | Live test: web call, phone call, email approval from a phone, FlowCRM Inbox/automation | Team + Claude | 15 min |
+| 6 | Demo video (can be recorded locally now) | Team | 30 min |
+| 7 | Screenshots, LinkedIn post (written by the team), submission PDF | Team | 45 min |
 
 ## Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Alternate Clouds / Akash deploy rate limits (`429`) | Deploys fail or are delayed | Wait 2 to 3 minutes between attempts; deploy early |
-| Deepgram key rejected intermittently | Robotic browser voice instead of Deepgram | Browser voice fallback is built in; check the key on the deployed server |
-| University network blocks Telegram | Telegram can't be tested from laptops on campus Wi-Fi | Deployed server reaches Telegram; test with phones on mobile data |
-| Shared keys exposed in chat (database password, bot token, API keys) | Misuse after the event | Rotate all keys after the closing ceremony |
-| Per-turn latency over 4 s on slow networks | Slower conversation | Measure on the deployed server; add connection pooling if needed |
+| Platform outage continues past the deadline | No live URL for judges | Record the full demo locally; keep the variable sheets ready to deploy in minutes |
+| SignalWire trial limits | Calls only from verified numbers | Verify the presenter's phone; Click-to-Test in the SignalWire dashboard |
+| Resend free tier | Emails only to the account owner's address | Fine for owner alerts; verify a domain later for customer emails |
+| Keys exposed in chat (Neon, Groq, Deepgram, Telegram, Resend) | Misuse after the event | Rotate all of them after the closing ceremony |
