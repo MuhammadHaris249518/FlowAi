@@ -15,6 +15,9 @@ After changing code on `main`, update the FlowCRM branch:
 ```
 git checkout flowcrm-deploy
 git merge main
+copy deploylowcrm.Dockerfile Dockerfile      # a merge does not refresh the root copy
+copy deploylowcrm.dockerignore .dockerignore
+git commit -am "flowcrm-deploy: refresh root Dockerfile"   # only if it changed
 git push
 git checkout main
 ```
