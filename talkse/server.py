@@ -13,13 +13,16 @@ from dotenv import load_dotenv
 
 load_dotenv()  # must run before clinic_config reads DATA_FILE
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import call_engine
 import clinic_config
 import db
+import handoff
+import notifier
+import telegram_bot
 from poc import synthesize_bytes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -43,7 +46,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         # Keep serving /health and the page so the Logs tab shows the real problem
         log.error("Database init failed: %s", e)
+    telegram_stop = telegram_bot.start_polling()
+    if telegram_bot.token() and not telegram_bot.owner_chat():
+        log.warning("TELEGRAM_OWNER_CHAT_ID not set: send /start to the bot to get your chat ID")
     yield
+    if telegram_stop:
+        telegram_stop.set()
 
 
 app = FastAPI(title="Talkse", lifespan=lifespan)
@@ -71,6 +79,19 @@ class StartCallRequest(BaseModel):
     caller_phone: str | None = None
 
 
+class OwnerAnswer(BaseModel):
+    choice: str | None = None       # option id: approve / site_visit / callback
+    text: str | None = None         # typed answer to a caller's question
+    save_as_faq: bool = False       # teach the AI this answer for next time
+
+
+def require_owner(key: str | None) -> None:
+    """Optional protection for the owner console: set OWNER_CONSOLE_KEY to require ?key=... / X-Owner-Key."""
+    expected = os.getenv("OWNER_CONSOLE_KEY")
+    if expected and key != expected:
+        raise HTTPException(status_code=401, detail="Owner key required")
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -87,6 +108,7 @@ def info() -> dict:
     return {
         "name": clinic_config.CLINIC.get("name", "Talkse"),
         "tagline": clinic_config.CLINIC.get("tagline", ""),
+        "owner": clinic_config.OWNER_NAME,
     }
 
 
@@ -115,7 +137,84 @@ def call_turn(call_id: str, audio: UploadFile = File(...)) -> dict:
 
 @app.get("/api/calls/{call_id}/status")
 def call_status(call_id: str) -> dict:
+    """Polled every 2s while the caller waits for the owner. Carries the owner's answer as speech once it arrives."""
     status = call_engine.get_status(call_id)
     if status is None:
         raise HTTPException(status_code=404, detail="Call not found")
+    if status.get("new_reply"):
+        status["audio_b64"] = tts_b64(status["reply_text"])
     return status
+
+
+# ---- Owner console (human in the loop) ---------------------------------------
+
+@app.get("/owner")
+def owner_page() -> FileResponse:
+    return FileResponse(os.path.join(STATIC_DIR, "owner.html"))
+
+
+@app.get("/api/owner/escalations")
+def owner_escalations(key: str | None = None, x_owner_key: str | None = Header(default=None)) -> dict:
+    require_owner(key or x_owner_key)
+    rows = db.list_escalations()
+    return {
+        "owner": clinic_config.OWNER_NAME,
+        "business": clinic_config.BUSINESS_NAME,
+        "timeout_seconds": int(os.getenv("HANDOFF_TIMEOUT_SECONDS", "45")),
+        "channels": notifier.active_channels(),
+        "escalations": [
+            {
+                "id": str(r["id"]),
+                "call_id": str(r["call_id"]) if r["call_id"] else None,
+                "kind": r["kind"],
+                "status": r["status"],
+                "summary": r["summary"],
+                "options": (r["options_json"] or {}).get("options", []) if isinstance(r["options_json"], dict) else [],
+                "answer": r["answer"],
+                "caller_name": r.get("caller_name"),
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.post("/api/owner/escalations/{escalation_id}/answer")
+def owner_answer(escalation_id: str, body: OwnerAnswer, key: str | None = None,
+                 x_owner_key: str | None = Header(default=None)) -> dict:
+    require_owner(key or x_owner_key)
+    result = handoff.answer_escalation(escalation_id, choice=body.choice, text=body.text, save_as_faq=body.save_as_faq)
+    if not result["ok"]:
+        raise HTTPException(status_code=409, detail=result["error"])
+    return result
+
+
+@app.post("/api/owner/escalations/{escalation_id}/ack")
+def owner_ack(escalation_id: str, key: str | None = None, x_owner_key: str | None = Header(default=None)) -> dict:
+    require_owner(key or x_owner_key)
+    return handoff.acknowledge(escalation_id)
+
+
+@app.get("/api/owner/faqs")
+def owner_faqs(key: str | None = None, x_owner_key: str | None = Header(default=None)) -> dict:
+    """FAQs the owner taught the AI (Save as FAQ)."""
+    require_owner(key or x_owner_key)
+    return {"faqs": [{"question": f["question"], "answer": f["answer"], "source": f["source"]} for f in db.get_faqs()]}
+
+
+# ---- Reserved for channel webhooks (Telegram, SMS...) -------------------------
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request,
+                           x_telegram_bot_api_secret_token: str | None = Header(default=None)) -> dict:
+    """Used only with TELEGRAM_MODE=webhook (default is polling, which needs no webhook).
+    Register it once: setWebhook url=<PUBLIC_BASE_URL>/telegram/webhook secret_token=<TELEGRAM_WEBHOOK_SECRET>."""
+    if telegram_bot.mode() != "webhook":
+        raise HTTPException(status_code=409, detail="Telegram is in polling mode")
+    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET")
+    if not expected or x_telegram_bot_api_secret_token != expected:
+        raise HTTPException(status_code=401, detail="Bad secret token")
+    update = await request.json()
+    import asyncio
+    await asyncio.to_thread(telegram_bot.handle_update, update)  # blocking DB + Telegram calls
+    return {"ok": True}

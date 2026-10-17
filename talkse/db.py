@@ -199,6 +199,118 @@ def update_appointment_time(id_or_key: str, new_start, new_end) -> dict | None:
     finally:
         conn.close()
 
+def create_escalation(call_id: str, kind: str, summary: str, details: dict, status: str = "pending") -> dict:
+    """Creates a handoff to the owner. kind: approval | question | hazard. details holds options and the raw question."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO talkse.escalations (call_id, kind, summary, options_json, status)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING *;
+            """, (str(call_id), kind, summary, json.dumps(details, default=str), status))
+            row = cur.fetchone()
+            conn.commit()
+            return dict(row)
+    finally:
+        conn.close()
+
+def get_escalation(escalation_id: str) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM talkse.escalations WHERE id::text = %s;", (str(escalation_id),))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+def transition_escalation(escalation_id: str, from_status: str, to_status: str, answer: str = None) -> dict | None:
+    """Moves an escalation from one status to another, only if it is still in from_status.
+
+    Atomic, so two owner clicks, or the owner answering just as the timeout fires,
+    can never both win. Returns the updated row, or None if someone else got there first.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                UPDATE talkse.escalations
+                SET status = %s,
+                    answer = COALESCE(%s, answer),
+                    answered_at = CASE WHEN %s = 'answered' THEN now() ELSE answered_at END
+                WHERE id::text = %s AND status = %s
+                RETURNING *;
+            """, (to_status, answer, to_status, str(escalation_id), from_status))
+            row = cur.fetchone()
+            conn.commit()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+def set_escalation_telegram_message(escalation_id: str, message_id: int) -> None:
+    """Remembers which Telegram message carries this escalation, so a reply to it can be matched."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE talkse.escalations SET telegram_message_id = %s WHERE id::text = %s;",
+                        (message_id, str(escalation_id)))
+        conn.commit()
+    finally:
+        conn.close()
+
+def get_escalation_by_telegram_message(message_id: int) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM talkse.escalations WHERE telegram_message_id = %s;", (message_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+def list_escalations(limit: int = 30) -> list[dict]:
+    """Recent escalations, newest first, with the caller's name, for the owner console."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT e.*, c.caller_name, c.status AS call_status
+                FROM talkse.escalations e
+                LEFT JOIN talkse.calls c ON c.id = e.call_id
+                ORDER BY e.created_at DESC
+                LIMIT %s;
+            """, (limit,))
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+def insert_faq(question: str, answer: str, source: str = "staff") -> dict:
+    """Saves an FAQ the AI can answer from now on (Phase 8 learning)."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO talkse.faqs (question, answer, source)
+                VALUES (%s, %s, %s)
+                RETURNING *;
+            """, (question, answer, source))
+            row = cur.fetchone()
+            conn.commit()
+            return dict(row)
+    finally:
+        conn.close()
+
+def get_faqs() -> list[dict]:
+    """Staff-saved FAQs (talkse.faqs), oldest first."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, question, answer, source FROM talkse.faqs ORDER BY created_at;")
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
 def create_call(state: dict, caller_phone: str = None) -> dict:
     """Creates a call row and returns it."""
     conn = get_connection()

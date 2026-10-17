@@ -7,3 +7,4 @@ deepgram-sdk>=5,<6
 psycopg2-binary>=2.9.9,<3
 python-dateutil>=2.9,<3
 python-dotenv>=1.0,<2
+tzdata>=2024.1
