@@ -17,7 +17,7 @@ type Tab = "all" | "notifications" | "drafts" | "sent";
 function sourceOf(m: Message): Source {
   if (m.status === "DRAFT") return "ai_draft";
   if (m.fromAddress === "Talkse AI receptionist") return "receptionist";
-  if (m.fromAddress === "FlowCRM Automation") return "automation";
+  if (m.fromAddress === "Cool Breeze Automation" || m.fromAddress === "FlowCRM Automation") return "automation";
   return "email";
 }
 

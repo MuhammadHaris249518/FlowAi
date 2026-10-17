@@ -236,7 +236,7 @@ async function executeStaticAction(config: Record<string, unknown>, context: Rec
         status: "RECEIVED",
         subject: fill((config.subject as string) ?? "Workflow notification", values),
         body: fill((config.message as string) ?? "", values),
-        fromAddress: "FlowCRM Automation",
+        fromAddress: "Cool Breeze Automation",
         receivedAt: new Date(),
       },
     });

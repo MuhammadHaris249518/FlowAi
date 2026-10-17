@@ -123,7 +123,7 @@ def book_visit(customer_name: str, service: str, preferred_time: str, area: str,
             call = db.create_call(state, phone or None)
             call_id = str(call["id"])
             message = handoff.escalate(call_id, state, "approval", reason)
-            db.update_call(call_id, state, [{"role": "assistant", "text": f"Approval requested via FlowCRM assistant: {reason}"}])
+            db.update_call(call_id, state, [{"role": "assistant", "text": f"Approval requested via the CRM assistant: {reason}"}])
             return {"booked": False, "needs_owner_approval": True, "approval_request_id": state["escalation"]["id"],
                     "reason": reason,
                     "message": f"Not booked yet: {config.OWNER_NAME} must approve this job ({reason}). The request was "
@@ -151,7 +151,7 @@ def book_visit(customer_name: str, service: str, preferred_time: str, area: str,
     state["booking_result"] = result
     if not call_id:
         call_id = str(db.create_call(state, phone or None)["id"])
-    db.update_call(call_id, state, [{"role": "assistant", "text": f"Booked via FlowCRM assistant: {result['message']}"}])
+    db.update_call(call_id, state, [{"role": "assistant", "text": f"Booked via the CRM assistant: {result['message']}"}])
     crm_sync.sync_call(call_id)
     return {"booked": True, "message": result["message"], "technician": result["provider_name"],
             "time": result["scheduled_start"], "deposit_required": result["deposit_required"]}

@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   // Form states
-  const [orgName, setOrgName] = useState("FlowCRM Workspace");
+  const [orgName, setOrgName] = useState("Cool Breeze Home Services");
   const [domain, setDomain] = useState("flowcrm.io");
   const [inboundEmail, setInboundEmail] = useState("inbound@flowcrm.io");
   const [timezone, setTimezone] = useState("UTC");

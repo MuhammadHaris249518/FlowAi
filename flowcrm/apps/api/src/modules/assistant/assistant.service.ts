@@ -15,7 +15,7 @@ import type {
 
 const MAX_TOOL_ROUNDS = 6;
 
-const SYSTEM_PROMPT = `You are the AI assistant inside FlowCRM for a home-services business (AC, plumbing, electrical).
+const SYSTEM_PROMPT = `You are the AI assistant inside the Cool Breeze CRM for a home-services business (AC, plumbing, electrical).
 You have two kinds of tools:
 - CRM tools (leads, contacts, deals, tasks, reports, messages): the business's sales data.
 - Talkse tools (names start with "talkse__"), reached over MCP: the AI voice receptionist that answers customer
