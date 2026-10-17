@@ -24,6 +24,7 @@ import handoff
 import mcp_server
 import notifier
 import telegram_bot
+import telephony
 from poc import synthesize_bytes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Talkse", lifespan=lifespan)
 app.mount("/mcp", mcp_app)
+app.include_router(telephony.router)  # real phone calls (SignalWire cXML)
 
 
 def tts_b64(text: str) -> str | None:

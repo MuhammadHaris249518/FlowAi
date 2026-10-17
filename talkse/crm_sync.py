@@ -125,6 +125,7 @@ def _summary(state: dict) -> str:
         esc = state.get("escalation") or {}
         kinds = {
             "callback": "Owner chose to call back",
+            "hung_up": "Caller hung up mid-call, call back",
             "timed_out": "Owner didn't answer in time, call back",
             "approval": "Needs owner approval",
             "question": "Asked a question the AI couldn't answer",

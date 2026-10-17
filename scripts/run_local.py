@@ -44,7 +44,9 @@ def main() -> None:
         cmd, cwd = "npx ts-node-dev --transpile-only src/server.ts", os.path.join("flowcrm", "apps", "api")
         extra = {**flowcrm_db, "PORT": "4000", "AUTH_MODE": "demo",
                  "DEMO_CLERK_ID": env.get("DEMO_CLERK_ID", "demo_haris"),
-                 "DEMO_ORG_ID": env.get("DEMO_ORG_ID", env.get("CRM_ORG_ID", "org_coolbreeze"))}
+                 "DEMO_ORG_ID": env.get("DEMO_ORG_ID", env.get("CRM_ORG_ID", "org_coolbreeze")),
+                 # AI Assistant: Groq LLM + the Talkse voice agent's tools over MCP
+                 "TALKSE_MCP_URL": env.get("TALKSE_MCP_URL", "http://localhost:8000/mcp/")}
     elif which == "web":
         cmd, cwd = "npx next dev -p 3000", os.path.join("flowcrm", "apps", "web")
         extra = {"NEXT_PUBLIC_AUTH_MODE": "demo", "NEXT_PUBLIC_API_URL": "http://localhost:4000/api/v1",

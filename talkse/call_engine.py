@@ -185,7 +185,15 @@ def _execute_action(state: dict, call_id: str = None) -> str:
 
 
 def handle_turn(call_id: str, audio_bytes: bytes, filename: str) -> dict:
-    """Runs one caller turn. Returns transcript, reply_text and the call status."""
+    """Runs one caller turn from recorded audio (browser calls): transcribe, then handle_text_turn."""
+    if not db.get_call(call_id):
+        raise KeyError(f"Call {call_id} not found")
+    return handle_text_turn(call_id, safe_transcribe_with_retry(audio_bytes, filename) or "")
+
+
+def handle_text_turn(call_id: str, transcript: str) -> dict:
+    """Runs one caller turn from text (phone calls arrive already transcribed by SignalWire).
+    Returns transcript, reply_text and the call status."""
     call = db.get_call(call_id)
     if not call:
         raise KeyError(f"Call {call_id} not found")
@@ -199,8 +207,7 @@ def handle_turn(call_id: str, audio_bytes: bytes, filename: str) -> dict:
 
     state["turn_count"] = state.get("turn_count", 0) + 1
 
-    # 1. Transcribe audio
-    transcript = safe_transcribe_with_retry(audio_bytes, filename)
+    # 1. Nothing heard
     if not transcript or not transcript.strip():
         reply_text = "Sorry, I didn't catch that. Could you say it again?"
         db.update_call(call_id, state, [{"role": "assistant", "text": reply_text}])

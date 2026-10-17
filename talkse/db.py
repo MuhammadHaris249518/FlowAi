@@ -263,6 +263,17 @@ def find_booking(caller_name: str, scheduled_start) -> dict | None:
     finally:
         conn.close()
 
+def find_call_by_sid(call_sid: str) -> dict | None:
+    """The call created for a phone provider's CallSid (stored in state_json)."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM talkse.calls WHERE state_json->>'call_sid' = %s LIMIT 1;", (call_sid,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
 def list_calls(limit: int = 10) -> list[dict]:
     """Most recent calls, newest first."""
     conn = get_connection()
