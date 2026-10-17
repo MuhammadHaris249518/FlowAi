@@ -27,4 +27,5 @@ export interface Message {
   receivedAt: string | null;
   createdAt: string;
   attachments: MessageAttachment[];
+  contactName?: string | null;
 }

@@ -21,9 +21,13 @@ function subtitleFor(data: BuilderNodeData): string {
         ? `Create task: ${c.title ?? "untitled"}`
         : c.action === "UPDATE_LEAD_STATUS"
           ? `Set lead status: ${c.status ?? "?"}`
-          : "Not configured";
+          : c.action === "NOTIFY_OWNER"
+            ? `Notify owner: ${c.subject ?? "untitled"}`
+            : "Not configured";
     case "ACTION_AI":
-      return "Coming soon";
+      return typeof c.instructions === "string" && c.instructions
+        ? `AI email: ${c.instructions.slice(0, 40)}${c.instructions.length > 40 ? "…" : ""}`
+        : "Not configured";
   }
 }
 

@@ -19,6 +19,16 @@ export const communicationRepository = {
     });
   },
 
+  // Inbox: every message in the org (automation/Talkse notifications, AI drafts, emails), newest first
+  async listInbox(auth: AuthContext, limit: number) {
+    return prisma.message.findMany({
+      where: scopeFilter(auth),
+      include: { attachments: { include: { document: true } }, contact: { select: { fullName: true } } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  },
+
   async listForLead(auth: AuthContext, leadId: string, limit: number) {
     return prisma.message.findMany({
       where: { ...scopeFilter(auth), leadId },

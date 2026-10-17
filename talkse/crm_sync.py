@@ -8,11 +8,13 @@ Per finished call:
     every call       -> "Lead"      (score: booked 90, needs owner 70, other 40) + CALL_LOGGED activity
     booking          -> "Deal"      in stage MEETING + MEETING_SCHEDULED activity
     needs_human /
-    emergency        -> "Task"      priority HIGH, due in 2 hours
+    emergency        -> "Task"      priority HIGH, due in 2 hours + an Inbox notification ("Message")
+    lead / deal      -> "OutboxEvent" LEAD_CREATED / DEAL_STAGE_CHANGED, so FlowCRM automation workflows run
 
 A CRM failure must never break a call: every entry point logs and returns.
 """
 
+import json
 import logging
 import os
 import threading
@@ -112,6 +114,24 @@ def log_activity(cur, org_id: str, activity_type: str, message: str) -> None:
     """, (_new_id("ac"), activity_type, message, org_id))
 
 
+def emit_event(cur, org_id: str, event_type: str, entity_type: str, entity_id: str, entity: dict) -> None:
+    """Same payload shape as FlowCRM's emitOutboxEvent; its outbox poller starts matching workflows."""
+    cur.execute("""
+        INSERT INTO "OutboxEvent" (id, "organizationId", type, payload)
+        VALUES (%s, %s, %s, %s::jsonb);
+    """, (_new_id("ob"), org_id, event_type,
+          json.dumps({"entityType": entity_type, "entityId": entity_id, "entity": entity})))
+
+
+def notify_inbox(cur, org_id: str, contact_id: str, lead_id: str, subject: str, body: str) -> None:
+    """A notification for the owner in FlowCRM's Inbox (a received message from the AI receptionist)."""
+    cur.execute("""
+        INSERT INTO "Message" (id, "organizationId", "contactId", "leadId", channel, direction, status,
+                               subject, body, "fromAddress", "receivedAt", "updatedAt")
+        VALUES (%s, %s, %s, %s, 'EMAIL', 'INBOUND', 'RECEIVED', %s, %s, 'Talkse AI receptionist', now(), now());
+    """, (_new_id("ms"), org_id, contact_id, lead_id, subject, body))
+
+
 def _summary(state: dict) -> str:
     """One readable line for the Lead notes and Activity feed."""
     status = state.get("status")
@@ -173,20 +193,32 @@ def sync_call(call_id: str) -> None:
                 company_id = upsert_company(cur, org_id, state.get("company_name"))
                 contact_id = upsert_contact(cur, org_id, owner_id, name, call.get("caller_phone"), company_id)
                 lead_status = "QUALIFIED" if status == "done" else "CONTACTED" if status == "needs_human" else "NEW"
-                lead_id = create_lead(cur, org_id, owner_id, contact_id, notes, SCORES.get(status, 40), lead_status)
+                score = SCORES.get(status, 40)
+                lead_id = create_lead(cur, org_id, owner_id, contact_id, notes, score, lead_status)
                 log_activity(cur, org_id, "CALL_LOGGED", f"Talkse AI call with {caller}: {summary}")
+                emit_event(cur, org_id, "LEAD_CREATED", "Lead", lead_id,
+                           {"status": lead_status, "source": SOURCE, "score": score, "outcome": status,
+                            "service": state.get("service")})
 
                 booking = state.get("booking_result") or {}
                 if status == "done" and booking.get("status") == "confirmed":
                     service = config.get_service(booking.get("appointment", {}).get("service_id") or state.get("service"))
                     who = f"{caller} ({state['area']})" if state.get("area") else caller
                     title = f"{booking.get('service_name', 'Booking')} · {who} · {booking.get('scheduled_start', '')}"
-                    create_deal(cur, org_id, owner_id, contact_id, title, _deal_value(service), company_id)
+                    value = _deal_value(service)
+                    deal_id = create_deal(cur, org_id, owner_id, contact_id, title, value, company_id)
                     log_activity(cur, org_id, "MEETING_SCHEDULED", f"Booked by Talkse AI: {title}")
+                    emit_event(cur, org_id, "DEAL_STAGE_CHANGED", "Deal", deal_id,
+                               {"fromStage": None, "toStage": "MEETING", "value": value, "title": title})
 
                 if status in ("needs_human", "emergency"):
                     prefix = "URGENT safety call" if status == "emergency" else "Call back"
                     create_task(cur, org_id, owner_id, f"{prefix}: {caller}. {summary}", "HIGH", contact_id, lead_id)
+                    phone = call.get("caller_phone")
+                    phone_part = f" ({phone})" if phone else ""
+                    notify_inbox(cur, org_id, contact_id, lead_id, f"{prefix}: {caller}",
+                                 f"{summary}\n\nCaller: {caller}{phone_part}\n"
+                                 "The AI receptionist recommends calling back as soon as possible.")
 
                 cur.execute("UPDATE talkse.calls SET crm_contact_id = %s, crm_lead_id = %s WHERE id::text = %s;",
                             (contact_id, lead_id, str(call_id)))

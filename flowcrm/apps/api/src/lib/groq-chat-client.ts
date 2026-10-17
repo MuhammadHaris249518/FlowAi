@@ -46,8 +46,7 @@ export const groqChatClient = {
     const body = JSON.stringify({
       model,
       messages: [{ role: "system", content: system }, ...toOpenAiMessages(messages)],
-      tools,
-      tool_choice: "auto",
+      ...(tools.length ? { tools, tool_choice: "auto" } : {}),
       temperature: 0.2,
       ...(model.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
     });
@@ -86,5 +85,11 @@ export const groqChatClient = {
         return { id: c.id, name: c.function?.name, arguments: args };
       }),
     };
+  },
+
+  /** Plain completion without tools (workflow AI actions): returns the model's text. */
+  async complete(system: string, user: string): Promise<string> {
+    const turn = await groqChatClient.chat(system, [{ role: "user", content: user }], []);
+    return turn.content ?? "";
   },
 };

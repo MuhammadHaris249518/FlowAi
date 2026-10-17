@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowRun } from "@prisma/client";
 import { aiServiceClient, type EmailDraftContext } from "../../lib/ai-service-client";
+import { groqChatClient } from "../../lib/groq-chat-client";
 
 export const AI_POLL_INTERVAL_MS = 5000;
 export const AI_MAX_POLL_ATTEMPTS = 40; // ~3.3 min ceiling — job_store is in-memory and non-durable
@@ -70,27 +71,163 @@ function evaluateCondition(config: Record<string, unknown>, context: Record<stri
     return undefined;
   }, context);
 
+  // The builder stores every typed value as a string ("1000", "MEETING"): compare numbers as numbers
+  const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
+  const same = String(actual ?? "").toLowerCase() === String(value ?? "").toLowerCase();
+
   switch (op) {
-    case "eq": return actual === value;
-    case "neq": return actual !== value;
-    case "gte": return typeof actual === "number" && typeof value === "number" && actual >= value;
-    case "lte": return typeof actual === "number" && typeof value === "number" && actual <= value;
+    case "eq": return same;
+    case "neq": return !same;
+    case "gte": return num(actual) >= num(value);
+    case "lte": return num(actual) <= num(value);
+    case "contains": return String(actual ?? "").toLowerCase().includes(String(value ?? "").toLowerCase());
     default: return false;
   }
+}
+
+/**
+ * Names and values a node's text can reference as {{placeholder}}:
+ * contactName, contactPhone, dealTitle, dealValue, dealStage, leadStatus, leadScore, leadSource.
+ */
+async function loadPlaceholders(context: Record<string, unknown>): Promise<Record<string, string>> {
+  const organizationId = context.organizationId as string;
+  const entityId = context.entityId as string;
+  const out: Record<string, string> = {};
+
+  if (context.entityType === "Lead") {
+    const lead = await prisma.lead.findFirst({ where: { id: entityId, organizationId }, include: { contact: true } });
+    Object.assign(out, {
+      contactName: lead?.contact?.fullName ?? "the customer",
+      contactPhone: lead?.contact?.phone ?? "",
+      leadStatus: lead?.status ?? "",
+      leadScore: String(lead?.score ?? ""),
+      leadSource: lead?.source ?? "",
+      contactId: lead?.contactId ?? "",
+    });
+  } else if (context.entityType === "Deal") {
+    const deal = await prisma.deal.findFirst({ where: { id: entityId, organizationId }, include: { contact: true } });
+    Object.assign(out, {
+      contactName: deal?.contact?.fullName ?? "the customer",
+      contactPhone: deal?.contact?.phone ?? "",
+      dealTitle: deal?.title ?? "",
+      dealValue: deal ? `$${Number(deal.value).toLocaleString("en-US")}` : "",
+      dealStage: deal?.stage ?? "",
+      contactId: deal?.contactId ?? "",
+    });
+  }
+  return out;
+}
+
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => values[key] ?? "");
+}
+
+/** Who automation tasks go to when the event didn't name an assignee: the org's owner. */
+async function defaultAssignee(organizationId: string): Promise<string | null> {
+  const owner = await prisma.membership.findFirst({
+    where: { organizationId, role: "ORG_OWNER" },
+    select: { userId: true },
+  });
+  return owner?.userId ?? null;
+}
+
+/**
+ * ACTION_AI without the Python ai-service: Groq drafts the email right away.
+ * Same outcome as the ai-service path: a DRAFT message plus a review task, never auto-sent.
+ */
+async function draftEmailWithGroq(instructions: string, context: Record<string, unknown>): Promise<unknown> {
+  const organizationId = context.organizationId as string;
+  const leadId = context.entityType === "Lead" ? (context.entityId as string) : undefined;
+  const dealId = context.entityType === "Deal" ? (context.entityId as string) : undefined;
+  const values = await loadPlaceholders(context);
+  const draftContext = await buildEmailDraftContext(context);
+
+  const text = await groqChatClient.complete(
+    "You write short, friendly customer emails for a small business. " +
+      'Reply with JSON only: {"subject": "...", "body": "..."}. Plain text body, no markdown, under 120 words.',
+    `Instructions: ${fill(instructions, values)}\n\nCustomer context: ${JSON.stringify(draftContext)}`
+  );
+  let subject = "Follow-up";
+  let body = text.trim();
+  const json = text.match(/\{[\s\S]*\}/);
+  if (json) {
+    try {
+      const parsed = JSON.parse(json[0]) as { subject?: string; body?: string };
+      subject = parsed.subject?.trim() || subject;
+      body = parsed.body?.trim() || body;
+    } catch {
+      // not JSON: keep the raw text as the body
+    }
+  }
+
+  const contact = values.contactId ? await prisma.contact.findUnique({ where: { id: values.contactId } }) : null;
+  const draft = await prisma.message.create({
+    data: {
+      organizationId,
+      contactId: values.contactId || undefined,
+      leadId,
+      dealId,
+      channel: "EMAIL",
+      direction: "OUTBOUND",
+      status: "DRAFT",
+      subject,
+      body,
+      toAddress: contact?.email ?? null,
+      fromAddress: "AI Assistant",
+    },
+  });
+  await prisma.task.create({
+    data: {
+      organizationId,
+      title: `Review AI-drafted email: ${subject}`,
+      description: `${body}\n\n---\nDrafted by AI from a workflow. Review it in the Inbox before sending.`,
+      leadId,
+      dealId,
+      contactId: values.contactId || undefined,
+      assigneeId: await defaultAssignee(organizationId),
+      priority: "MEDIUM",
+      messageId: draft.id,
+    },
+  });
+  return { messageId: draft.id, subject };
 }
 
 async function executeStaticAction(config: Record<string, unknown>, context: Record<string, unknown>): Promise<unknown> {
   const action = config.action as string;
   const entityId = context.entityId as string;
+  const organizationId = context.organizationId as string;
+  const values = await loadPlaceholders(context);
 
   if (action === "CREATE_TASK") {
     return prisma.task.create({
       data: {
-        organizationId: context.organizationId as string,
-        title: (config.title as string) ?? "Follow up",
-        assigneeId: (context.assigneeId as string) ?? null,
+        organizationId,
+        title: fill((config.title as string) ?? "Follow up", values),
+        assigneeId: (context.assigneeId as string) ?? (await defaultAssignee(organizationId)),
         priority: (config.priority as "LOW" | "MEDIUM" | "HIGH") ?? "MEDIUM",
+        dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         leadId: context.entityType === "Lead" ? entityId : undefined,
+        dealId: context.entityType === "Deal" ? entityId : undefined,
+        contactId: values.contactId || undefined,
+      },
+    });
+  }
+
+  if (action === "NOTIFY_OWNER") {
+    // Notifications live in the Inbox as received messages from "FlowCRM Automation"
+    return prisma.message.create({
+      data: {
+        organizationId,
+        contactId: values.contactId || undefined,
+        leadId: context.entityType === "Lead" ? entityId : undefined,
+        dealId: context.entityType === "Deal" ? entityId : undefined,
+        channel: "EMAIL",
+        direction: "INBOUND",
+        status: "RECEIVED",
+        subject: fill((config.subject as string) ?? "Workflow notification", values),
+        body: fill((config.message as string) ?? "", values),
+        fromAddress: "FlowCRM Automation",
+        receivedAt: new Date(),
       },
     });
   }
@@ -175,6 +312,20 @@ export async function advanceRun(run: WorkflowRun, workflow: WorkflowWithGraph):
         await prisma.workflowRun.update({ where: { id: run.id }, data: { status: "FAILED" } });
         await logStep(run.id, node.id, "FAILED", undefined, "ACTION_AI node has no instructions configured");
         return;
+      }
+
+      // No ai-service deployed: draft with Groq inline and continue to the next node
+      if (!process.env.AI_SERVICE_URL && groqChatClient.enabled()) {
+        try {
+          const output = await draftEmailWithGroq(instructions, context);
+          await logStep(run.id, node.id, "SUCCESS", output);
+        } catch (err) {
+          await prisma.workflowRun.update({ where: { id: run.id }, data: { status: "FAILED" } });
+          await logStep(run.id, node.id, "FAILED", undefined, `AI draft failed: ${(err as Error).message}`);
+          return;
+        }
+        currentNodeId = findNextNodeId(workflow.edges, node.id);
+        continue;
       }
 
       try {
