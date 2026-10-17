@@ -101,7 +101,7 @@ export const NODE_TYPE_DEFS: Record<WorkflowNodeType, NodeTypeDef> = {
   TRIGGER: {
     type: "TRIGGER",
     label: "Trigger",
-    description: "Starts the workflow when something happens in FlowCRM.",
+    description: "Starts the workflow when something happens in the CRM.",
     icon: Zap,
     accent: "text-blue-600 bg-blue-50 border-blue-200",
     implemented: true,

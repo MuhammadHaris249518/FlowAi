@@ -45,7 +45,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center gap-2 border-b border-surface-border px-5">
         <Sparkles className="h-5 w-5 text-brand-500" aria-hidden />
         <span className="text-sm font-semibold text-ink-900">
-          FlowCRM <span className="text-brand-500">AI</span>
+          Cool <span className="text-brand-500">Breeze</span>
         </span>
       </div>
 

@@ -61,7 +61,7 @@ export default function CreateOrganizationPage() {
         <div className="mb-6 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-brand-500" aria-hidden />
           <span className="text-sm font-semibold text-ink-900">
-            FlowCRM <span className="text-brand-500">AI</span>
+            Cool <span className="text-brand-500">Breeze</span>
           </span>
         </div>
 

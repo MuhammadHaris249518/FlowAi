@@ -6,9 +6,9 @@ import { DEMO_MODE } from "@/lib/demo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FlowCRM AI — Close More Deals. Automate Everything.",
+  title: "Cool Breeze · CRM",
   description:
-    "FlowCRM AI helps businesses capture leads, automate follow-ups, manage deals, and close more deals with the power of AI.",
+    "Cool Breeze Home Services CRM: every call from the AI receptionist becomes a lead, deal and follow-up.",
 };
 
 export default function RootLayout({
