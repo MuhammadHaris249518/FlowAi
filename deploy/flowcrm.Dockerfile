@@ -44,9 +44,9 @@ COPY flowcrm/start.sh ./start.sh
 # Strip Windows line endings: a CRLF start.sh fails under Linux sh ("\r: not found")
 RUN sed -i 's/\r$//' ./start.sh
 
-# Must match the port the Alternate Clouds service publishes
-ENV PORT=3000 \
+# Must match the container port the Alternate Clouds service routes to (Settings > Ports: 80)
+ENV PORT=80 \
     HOSTNAME=0.0.0.0
-EXPOSE 3000
+EXPOSE 80
 
 CMD ["sh", "./start.sh"]
