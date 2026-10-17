@@ -166,14 +166,25 @@ def _poll_loop(stop: threading.Event) -> None:
     except Exception as e:
         log.info("deleteWebhook: %s", e)
     offset = None
+    conflict_logged = False
     log.info("Telegram polling started")
     while not stop.is_set():
         try:
             updates = call("getUpdates", {"timeout": 25, "offset": offset,
                                           "allowed_updates": ["message", "callback_query"]}, timeout=35)
+            conflict_logged = False
         except Exception as e:
-            log.warning("Telegram polling error: %s", e)
-            stop.wait(5)
+            # 409: another process polls the same bot token (an old deployment still running,
+            # a second replica, or a local run). Say so once, back off, take over when it stops.
+            if "409" in str(e):
+                if not conflict_logged:
+                    log.warning("Telegram 409 Conflict: another Talkse instance is polling this bot token. "
+                                "Stop the other instance (old deployment / local run); retrying every 30 s.")
+                    conflict_logged = True
+                stop.wait(30)
+            else:
+                log.warning("Telegram polling error: %s", e)
+                stop.wait(5)
             continue
         for update in updates:
             offset = update["update_id"] + 1
