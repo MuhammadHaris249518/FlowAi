@@ -1,5 +1,5 @@
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
+uvicorn[standard]>=0.31.1,<1
 python-multipart==0.0.9
 groq>=0.11,<1
 google-genai>=1.0,<2
@@ -8,3 +8,7 @@ psycopg2-binary>=2.9.9,<3
 python-dateutil>=2.9,<3
 python-dotenv>=1.0,<2
 tzdata>=2024.1
+# MCP server (pins keep starlette compatible with fastapi 0.115)
+mcp==1.30.0
+starlette>=0.37.2,<0.39
+sse-starlette>=1.6.1,<2.2

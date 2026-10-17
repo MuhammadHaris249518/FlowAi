@@ -248,6 +248,42 @@ def transition_escalation(escalation_id: str, from_status: str, to_status: str, 
     finally:
         conn.close()
 
+def find_booking(caller_name: str, scheduled_start) -> dict | None:
+    """A confirmed appointment for this caller at this exact time, if one exists."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT * FROM talkse.appointments
+                WHERE status = 'confirmed' AND lower(caller_name) = lower(%s) AND scheduled_start = %s
+                LIMIT 1;
+            """, (caller_name, scheduled_start))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+def find_call_by_sid(call_sid: str) -> dict | None:
+    """The call created for a phone provider's CallSid (stored in state_json)."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM talkse.calls WHERE state_json->>'call_sid' = %s LIMIT 1;", (call_sid,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+def list_calls(limit: int = 10) -> list[dict]:
+    """Most recent calls, newest first."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM talkse.calls ORDER BY started_at DESC LIMIT %s;", (limit,))
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
 def set_escalation_telegram_message(escalation_id: str, message_id: int) -> None:
     """Remembers which Telegram message carries this escalation, so a reply to it can be matched."""
     conn = get_connection()

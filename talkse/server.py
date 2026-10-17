@@ -21,8 +21,10 @@ import call_engine
 import clinic_config
 import db
 import handoff
+import mcp_server
 import notifier
 import telegram_bot
+import telephony
 from poc import synthesize_bytes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -34,6 +36,10 @@ MAX_AUDIO_BYTES = 5 * 1024 * 1024  # ~5 MB is several minutes of webm speech
 # Fixed phrases are synthesized once and reused
 _tts_cache: dict[str, str] = {}
 CACHED_PHRASES = {call_engine.GREETING}
+
+
+# MCP server (Streamable HTTP) mounted at /mcp; its session manager runs inside our lifespan
+mcp_app = mcp_server.mcp.streamable_http_app()
 
 
 @asynccontextmanager
@@ -49,12 +55,15 @@ async def lifespan(app: FastAPI):
     telegram_stop = telegram_bot.start_polling()
     if telegram_bot.token() and not telegram_bot.owner_chat():
         log.warning("TELEGRAM_OWNER_CHAT_ID not set: send /start to the bot to get your chat ID")
-    yield
+    async with mcp_server.mcp.session_manager.run():
+        yield
     if telegram_stop:
         telegram_stop.set()
 
 
 app = FastAPI(title="Talkse", lifespan=lifespan)
+app.mount("/mcp", mcp_app)
+app.include_router(telephony.router)  # real phone calls (SignalWire cXML)
 
 
 def tts_b64(text: str) -> str | None:
