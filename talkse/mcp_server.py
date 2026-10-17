@@ -92,8 +92,8 @@ def book_visit(customer_name: str, service: str, preferred_time: str, area: str,
                approval_request_id: str = "") -> dict:
     """Book a technician visit and record it in the CRM (contact, lead, deal, activity).
     Jobs that need the owner's approval (installs, commercial, outside the service area) are NOT booked:
-    the owner gets an approval request instead. After the owner approves it (owner console, email,
-    WhatsApp), call book_visit again with the same details and approval_request_id to book it."""
+    the owner gets an approval request instead. After the owner approves it (owner console or email),
+    call book_visit again with the same details and approval_request_id to book it."""
     booking = _booking_key(customer_name, service, preferred_time, area)
     state = {
         "intent": "book", "service": service, "issue": None, "area": area, "preferred_time": preferred_time,

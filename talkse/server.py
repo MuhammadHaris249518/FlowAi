@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()  # must run before clinic_config reads DATA_FILE
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 import call_engine
@@ -29,7 +29,6 @@ import mcp_server
 import notifier
 import telegram_bot
 import telephony
-import whatsapp_notify
 from poc import synthesize_bytes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -306,27 +305,6 @@ def owner_faqs(key: str | None = None, x_owner_key: str | None = Header(default=
 
 
 # ---- Reserved for channel webhooks (Telegram, SMS...) -------------------------
-
-@app.get("/whatsapp/webhook")
-def whatsapp_verify(request: Request) -> Response:
-    """Meta's one-time webhook check: echo hub.challenge when hub.verify_token matches."""
-    q = request.query_params
-    expected = os.getenv("WHATSAPP_VERIFY_TOKEN")
-    if q.get("hub.mode") == "subscribe" and expected and q.get("hub.verify_token") == expected:
-        return Response(q.get("hub.challenge", ""), media_type="text/plain")
-    raise HTTPException(status_code=403, detail="Verification failed")
-
-
-@app.post("/whatsapp/webhook")
-async def whatsapp_webhook(request: Request, x_hub_signature_256: str | None = Header(default=None)) -> dict:
-    """Owner's button taps and replies from WhatsApp (Meta Cloud API)."""
-    raw = await request.body()
-    if not whatsapp_notify.verify_signature(raw, x_hub_signature_256):
-        raise HTTPException(status_code=401, detail="Bad signature")
-    import asyncio
-    await asyncio.to_thread(whatsapp_notify.handle_webhook, json.loads(raw or b"{}"))
-    return {"ok": True}  # always 200 for valid calls, or Meta retries
-
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request,
