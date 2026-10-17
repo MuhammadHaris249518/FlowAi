@@ -227,7 +227,8 @@ def book_appointment(state: dict, idempotency_key: str) -> dict:
         caller_name=caller_name,
         scheduled_start=requested_start,
         scheduled_end=scheduled_end,
-        deposit_required=deposit_required
+        deposit_required=deposit_required,
+        caller_phone=state.get("caller_phone"),
     )
     
     return {

@@ -12,6 +12,7 @@ conversation_loop.py is not imported: it imports audio_playback, which needs
 sounddevice and would crash inside Docker.
 """
 
+import re
 import time
 import uuid
 
@@ -83,6 +84,17 @@ def prompt_for_field(field: str) -> str:
 
 GREETING = prompt_for_field("intent")
 
+_NAME_PREFIXES = re.compile(r"^(my name is|my name's|the name is|name is|this is|it's|it is|i am|i'm)\s+", re.I)
+
+
+def _as_name(transcript: str) -> str | None:
+    """A bare answer to "may I have your full name?" ("Riley Phonefix.") when the LLM misses it."""
+    text = _NAME_PREFIXES.sub("", transcript.strip().strip(".!?, ")).strip(".!?, ")
+    words = text.split()
+    if 1 <= len(words) <= 4 and all(re.fullmatch(r"[A-Za-z][A-Za-z'\-]*", w) for w in words):
+        return " ".join(w[:1].upper() + w[1:] for w in words)
+    return None
+
 
 def safe_transcribe_with_retry(audio_bytes: bytes, filename: str) -> str | None:
     """Wraps STT call in a retry block."""
@@ -121,6 +133,7 @@ def start_call(caller_phone: str = None) -> tuple[str, str]:
         "area": None,
         "preferred_time": None,
         "caller_name": None,
+        "caller_phone": caller_phone,  # phone calls: SignalWire's `From`; saved on the appointment
         "existing_appointment_ref": None,
         "owner_approved": False,
         "escalation": None,
@@ -226,6 +239,9 @@ def handle_text_turn(call_id: str, transcript: str) -> dict:
         extracted = safe_extract_intent_with_retry(transcript)
         merge_state(state, extracted)
         asked_question = extracted.get("intent") == "question" or bool(extracted.get("question"))
+        # We just asked for the name and the LLM didn't extract one: take a short name-like answer as the name
+        if state.get("awaiting") == "caller_name" and not state.get("caller_name") and not asked_question:
+            state["caller_name"] = _as_name(transcript)
         # Callers describe a problem ("my sink is leaking") instead of naming a service or saying "book":
         # derive the service from the problem, and treat it as a booking
         if not state.get("service") and state.get("issue"):
@@ -264,6 +280,7 @@ def handle_text_turn(call_id: str, transcript: str) -> dict:
             else:
                 # 6. Ask for the next missing field, or run the booking engine
                 missing = next_missing_field(state)
+                state["awaiting"] = missing
                 reply_text = prompt_for_field(missing) if missing else _execute_action(state, call_id)
 
     turns.append({"role": "assistant", "text": reply_text})
