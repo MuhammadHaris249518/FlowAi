@@ -114,14 +114,20 @@
   .tip { margin-top: 8px; font-size: 12px; color: var(--faint); min-height: 18px; }
   kbd { font: 600 11px/1 inherit; padding: 2px 6px; border-radius: 6px; background: #fff; border: 1px solid var(--line); }
 
-  /* ---- Below the fold ---- */
-  .below { max-width: 1080px; margin: 40px auto 0; padding: 0 24px 40px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-  .card { background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 6px 24px rgba(15,36,64,0.04); }
-  .card + .card { margin-top: 20px; }
-  .card h2 { margin: 0 0 14px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display: flex; justify-content: space-between; align-items: center; }
-  .card h2 em { font-style: normal; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--faint); }
+  /* ---- Live conversation: appears under the orb once a call starts ---- */
+  .convo { max-width: 720px; margin: 22px auto 0; padding: 0 24px; }
+  .convo-card {
+    background: rgba(255,255,255,0.92); border: 1px solid var(--line); border-radius: 22px; padding: 18px 18px 16px;
+    box-shadow: 0 22px 60px rgba(15,36,64,0.09); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    animation: rise .35s ease-out; text-align: left;
+  }
+  .convo-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .convo-title { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--navy); }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 rgba(16,185,129,.5); animation: ping 1.6s infinite; }
+  @keyframes ping { to { box-shadow: 0 0 0 9px rgba(16,185,129,0); } }
+  .convo-head em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--faint); }
 
-  .transcript { display: flex; flex-direction: column; gap: 10px; height: 380px; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
+  .transcript { display: flex; flex-direction: column; gap: 10px; height: 260px; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
   .transcript::-webkit-scrollbar { width: 6px; }
   .transcript::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
   .msg { max-width: 86%; padding: 10px 14px; border-radius: 16px; font-size: 14px; animation: rise .25s ease-out; }
@@ -137,44 +143,76 @@
   .meta small { display: block; color: var(--muted); font-size: 11px; }
   .meta b { font-size: 13.5px; font-weight: 600; }
 
-  .biz-name { font-size: 17px; font-weight: 700; margin: 0; color: var(--navy); }
-  .biz-tag { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+  /* ---- Business details ---- */
+  .section { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .info { margin-top: 64px; }
+  .info-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .eyebrow-sm { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--teal-d); }
+  .biz-name { font-size: 24px; font-weight: 700; margin: 0; color: var(--navy); letter-spacing: -0.01em; }
+  .biz-tag { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+  .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+  .fact {
+    display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 16px; min-width: 0;
+    background: rgba(255,255,255,0.9); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(15,36,64,0.04);
+  }
+  .fact-ico { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-d); }
+  .fact-ico svg { width: 20px; height: 20px; }
+  .fact small { display: block; font-size: 12px; color: var(--muted); }
+  .fact b { display: block; font-size: 14.5px; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fact b a { color: var(--teal-d); text-decoration: none; }
+
+  .block { margin-top: 44px; }
+  .block-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .block-head h2 { margin: 0; font-size: 19px; font-weight: 700; color: var(--navy); letter-spacing: -0.01em; }
+  .block-head p { margin: 0; font-size: 13px; color: var(--muted); }
+  .card { background: rgba(255,255,255,0.9); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 6px 20px rgba(15,36,64,0.04); }
+  .card h3 { margin: 0 0 14px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+  .pair { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+  .techs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
   .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
   .badge.open { background: rgba(16,185,129,0.12); color: #047857; }
   .badge.closed { background: rgba(239,68,68,0.10); color: #b91c1c; }
   .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .facts { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 9px; font-size: 13.5px; }
-  .facts li { display: flex; justify-content: space-between; gap: 10px; }
-  .facts span:first-child { color: var(--muted); }
-  .facts span:last-child { text-align: right; font-weight: 500; }
-  .facts a { color: var(--teal-d); font-weight: 600; text-decoration: none; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line2); color: #334155; }
-  .tech { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13.5px; }
-  .tech .avatar { width: 30px; height: 30px; font-size: 11px; background: linear-gradient(145deg, #5eead4, var(--blue)); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-size: 12.5px; padding: 6px 12px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line2); color: #334155; }
+  .tech { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13.5px; min-width: 0; }
+  .tech .avatar { width: 34px; height: 34px; flex: none; font-size: 11.5px; background: linear-gradient(145deg, #5eead4, var(--blue)); }
   .tech small { display: block; color: var(--muted); font-size: 12px; }
-  .services { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-  .svc { padding: 12px 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line2); }
+  .services { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .svc {
+    padding: 16px 18px; border-radius: 16px; background: rgba(255,255,255,0.9); border: 1px solid var(--line);
+    box-shadow: 0 4px 14px rgba(15,36,64,0.03); transition: transform .15s, box-shadow .15s;
+  }
+  .svc:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15,36,64,0.08); }
   .svc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .svc-name { font-weight: 600; font-size: 13.5px; }
-  .svc-price { font-size: 13px; color: var(--teal-d); font-weight: 700; white-space: nowrap; }
-  .svc p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
-  .owner-tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700; color: #b45309; }
-  .alert { border: 1px solid rgba(239,68,68,0.25); background: rgba(239,68,68,0.05); color: #7f1d1d; border-radius: 14px; padding: 12px 14px; font-size: 13px; margin-top: 20px; }
+  .svc-name { font-weight: 600; font-size: 14px; color: var(--navy); }
+  .svc-price { font-size: 13.5px; color: var(--teal-d); font-weight: 700; white-space: nowrap; }
+  .svc p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+  .owner-tag { display: inline-block; margin-top: 10px; font-size: 11px; font-weight: 700; color: #b45309; background: rgba(245,158,11,0.12); padding: 3px 8px; border-radius: 999px; }
+  .alert {
+    display: flex; gap: 14px; align-items: center; border: 1px solid rgba(239,68,68,0.22); background: rgba(254,242,242,0.9);
+    color: #7f1d1d; border-radius: 16px; padding: 16px 18px; font-size: 13.5px;
+  }
+  .alert-ico { width: 38px; height: 38px; flex: none; border-radius: 12px; display: grid; place-items: center; background: rgba(239,68,68,0.12); color: #dc2626; }
+  .alert-ico svg { width: 20px; height: 20px; }
   .alert strong { display: block; color: #991b1b; margin-bottom: 2px; }
-  .full { grid-column: 1 / -1; }
-  footer { text-align: center; color: var(--faint); font-size: 12.5px; padding: 0 24px 28px; }
+  footer { text-align: center; color: var(--faint); font-size: 12.5px; padding: 48px 24px 32px; }
 
-  @media (max-width: 900px) {
-    .below { grid-template-columns: 1fr; }
-    .meta { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 960px) {
+    .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .services { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pair { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
     header { padding: 12px 16px; }
     .pill-online, .divider, .user-name { display: none; }
     .hero { padding-top: 36px; }
     .stage { height: 260px; }
-    .below { padding: 0 16px 32px; }
+    .section, .convo { padding: 0 16px; }
+    .info { margin-top: 48px; }
+    .facts, .services, .techs { grid-template-columns: 1fr; }
+    .meta { grid-template-columns: 1fr 1fr; }
+    .transcript { height: 220px; }
   }
 </style>
 </head>
@@ -245,13 +283,15 @@
     <span class="timer" id="timer" hidden>00:00</span>
   </div>
   <div class="tip" id="tip">Press Start Call, then hold the orb, the Hold button or <kbd>Space</kbd> while you speak.</div>
-</section>
 
-<section class="below">
-  <div>
-    <div class="card">
-      <h2>Live transcript <em id="m-status">Not started</em></h2>
-      <div class="transcript" id="chat"><div class="empty" id="empty">The conversation will appear here.</div></div>
+  <!-- The conversation lives right under the orb, and only once a call has started -->
+  <div class="convo" id="convo" hidden>
+    <div class="convo-card" aria-live="polite">
+      <div class="convo-head">
+        <span class="convo-title"><span class="live-dot"></span>Live conversation</span>
+        <em id="m-status">Not started</em>
+      </div>
+      <div class="transcript" id="chat"><div class="empty" id="empty">Connecting…</div></div>
       <div class="meta">
         <div><small>Status</small><b id="m-status2">Idle</b></div>
         <div><small>Turns</small><b id="m-turns">0</b></div>
@@ -260,34 +300,60 @@
       </div>
     </div>
   </div>
-  <aside>
-    <div class="card">
-      <p class="biz-name" id="biz-name">Loading…</p>
+</section>
+
+<section class="section info">
+  <div class="info-head">
+    <div>
+      <p class="eyebrow-sm">About the business</p>
+      <h2 class="biz-name" id="biz-name">Loading…</h2>
       <p class="biz-tag" id="biz-tagline"></p>
-      <span class="badge closed" id="open-badge"><span class="dot"></span><span id="open-text">…</span></span>
-      <ul class="facts">
-        <li><span>Hours today</span><span id="hours-today">–</span></li>
-        <li><span>Local time</span><span id="local-time">–</span></li>
-        <li><span>Phone</span><span id="phone">–</span></li>
-        <li><span>Owner</span><span id="owner">–</span></li>
-      </ul>
     </div>
-    <div class="card">
-      <h2>Service area</h2>
-      <div class="chips" id="area"></div>
+    <span class="badge closed" id="open-badge"><span class="dot"></span><span id="open-text">…</span></span>
+  </div>
+  <div class="facts">
+    <div class="fact">
+      <span class="fact-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+      <div style="min-width:0"><small>Hours today</small><b id="hours-today">–</b></div>
     </div>
-    <div class="card">
-      <h2>Technicians</h2>
-      <div id="techs"></div>
+    <div class="fact">
+      <span class="fact-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></span>
+      <div style="min-width:0"><small>Call the AI receptionist</small><b id="phone">–</b></div>
     </div>
-    <div class="alert">
-      <strong>Smell gas or see sparks?</strong>
-      Leave the house first and call 911. The AI gives safety steps and alerts the owner instantly.
+    <div class="fact">
+      <span class="fact-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+      <div style="min-width:0"><small>Local time</small><b id="local-time">–</b></div>
     </div>
-  </aside>
-  <div class="card full">
+    <div class="fact">
+      <span class="fact-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+      <div style="min-width:0"><small>Owner · approves big jobs</small><b id="owner">–</b></div>
+    </div>
+  </div>
+</section>
+
+<section class="section block">
+  <div class="block-head">
     <h2>Services &amp; prices</h2>
-    <div class="services" id="services"></div>
+    <p>The AI books routine jobs on the call. Jobs marked ★ are approved by the owner first.</p>
+  </div>
+  <div class="services" id="services"></div>
+</section>
+
+<section class="section block pair">
+  <div class="card">
+    <h3>Service area</h3>
+    <div class="chips" id="area"></div>
+  </div>
+  <div class="card">
+    <h3>Technicians</h3>
+    <div class="techs" id="techs"></div>
+  </div>
+</section>
+
+<section class="section block">
+  <div class="alert" role="note">
+    <span class="alert-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+    <div><strong>Smell gas or see sparks?</strong>Leave the house first and call 911. The AI gives safety steps right away and alerts the owner instantly.</div>
   </div>
 </section>
 
@@ -612,6 +678,9 @@
       const data = await res.json();
       callId = data.call_id;
       $("m-id").textContent = callId.slice(0, 8);
+      // Reveal the conversation under the orb, and bring it into view without losing the orb
+      $("convo").hidden = false;
+      requestAnimationFrame(() => $("convo").scrollIntoView({ behavior: "smooth", block: "nearest" }));
       setCallButton(true);
       startBtn.disabled = false;
       startTimer();
@@ -790,7 +859,7 @@
       $("tel-text").textContent = `${info.phone} · same AI, real phone line`;
       $("tel-link").hidden = false;
     }
-    $("owner").textContent = `${fullName} (${info.owner_title})`;
+    $("owner").textContent = fullName;
     $("area").innerHTML = "";
     (info.service_area || []).forEach(a => {
       const c = document.createElement("span"); c.className = "chip"; c.textContent = a; $("area").appendChild(c);
