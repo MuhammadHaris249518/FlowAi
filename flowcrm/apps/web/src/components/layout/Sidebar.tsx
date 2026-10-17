@@ -14,7 +14,6 @@ import {
   Sparkles,
   BarChart3,
   Inbox,
-  FileText,
   Settings,
   PhoneCall,
   UserCheck,
@@ -34,7 +33,6 @@ const NAV_ITEMS = [
   { href: "/automation", label: "Automation", icon: Zap },
   { href: "/ai-assistant", label: "AI Assistant", icon: Sparkles },
   { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/documents", label: "Documents", icon: FileText },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

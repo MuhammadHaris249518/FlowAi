@@ -102,7 +102,7 @@ function TriggerFields({ draft, commit }: { draft: Record<string, unknown>; comm
         <option value="LEAD_CREATED">A lead is created</option>
         <option value="LEAD_STATUS_CHANGED">A lead's status changes</option>
         <option value="LEAD_SCORE_CHANGED">A lead's AI score changes</option>
-        <option value="DEAL_STAGE_CHANGED">A deal's stage changes</option>
+        <option value="DEAL_STAGE_CHANGED">A deal's stage changes (incl. AI receptionist bookings)</option>
         <option value="TASK_OVERDUE">A task becomes overdue</option>
         <option value="ACTIVITY_LOGGED">An activity is logged</option>
       </select>
@@ -131,6 +131,7 @@ function ConditionFields({ draft, commit }: { draft: Record<string, unknown>; co
           <option value="neq">Does not equal</option>
           <option value="gte">Greater than or equal to</option>
           <option value="lte">Less than or equal to</option>
+          <option value="contains">Contains</option>
         </select>
       </Field>
       <Field label="Value">
@@ -171,15 +172,39 @@ function ActionStaticFields({ draft, commit }: { draft: Record<string, unknown>;
           onChange={(e) =>
             commit(
               e.target.value === "CREATE_TASK"
-                ? { action: "CREATE_TASK", title: "Follow up", priority: "MEDIUM" }
-                : { action: "UPDATE_LEAD_STATUS", status: "CONTACTED" }
+                ? { action: "CREATE_TASK", title: "Follow up with {{contactName}}", priority: "MEDIUM" }
+                : e.target.value === "NOTIFY_OWNER"
+                  ? { action: "NOTIFY_OWNER", subject: "New lead: {{contactName}}", message: "" }
+                  : { action: "UPDATE_LEAD_STATUS", status: "CONTACTED" }
             )
           }
         >
           <option value="CREATE_TASK">Create a task</option>
           <option value="UPDATE_LEAD_STATUS">Update lead status</option>
+          <option value="NOTIFY_OWNER">Notify owner (Inbox)</option>
         </select>
       </Field>
+
+      {action === "NOTIFY_OWNER" && (
+        <>
+          <Field label="Notification title">
+            <input
+              className={inputClass}
+              defaultValue={(draft.subject as string) ?? ""}
+              onBlur={(e) => commit({ ...draft, subject: e.target.value })}
+            />
+          </Field>
+          <Field label="Message">
+            <textarea
+              rows={3}
+              className={inputClass}
+              defaultValue={(draft.message as string) ?? ""}
+              onBlur={(e) => commit({ ...draft, message: e.target.value })}
+            />
+          </Field>
+          <PlaceholderHint />
+        </>
+      )}
 
       {action === "CREATE_TASK" && (
         <>
@@ -190,6 +215,7 @@ function ActionStaticFields({ draft, commit }: { draft: Record<string, unknown>;
               onBlur={(e) => commit({ ...draft, title: e.target.value })}
             />
           </Field>
+          <PlaceholderHint />
           <Field label="Priority">
             <select
               className={selectClass}
@@ -225,13 +251,28 @@ function ActionStaticFields({ draft, commit }: { draft: Record<string, unknown>;
 
 function ActionAiFields({ draft, commit }: { draft: Record<string, unknown>; commit: (v: Record<string, unknown>) => void }) {
   return (
-    <Field label="Instructions (draft only — not executed yet)">
-      <textarea
-        rows={4}
-        className={inputClass}
-        defaultValue={(draft.instructions as string) ?? ""}
-        onBlur={(e) => commit({ ...draft, instructions: e.target.value })}
-      />
-    </Field>
+    <>
+      <Field label="What should the AI write?">
+        <textarea
+          rows={5}
+          className={inputClass}
+          defaultValue={(draft.instructions as string) ?? ""}
+          onBlur={(e) => commit({ ...draft, instructions: e.target.value })}
+        />
+      </Field>
+      <p className="text-[11px] text-ink-500">
+        The draft lands in the Inbox with a review task. Nothing is sent automatically.
+      </p>
+      <PlaceholderHint />
+    </>
+  );
+}
+
+function PlaceholderHint() {
+  return (
+    <p className="text-[11px] leading-relaxed text-ink-500">
+      Placeholders: <code>{"{{contactName}}"}</code> <code>{"{{contactPhone}}"}</code> <code>{"{{dealTitle}}"}</code>{" "}
+      <code>{"{{dealValue}}"}</code> <code>{"{{dealStage}}"}</code> <code>{"{{leadScore}}"}</code> <code>{"{{leadSource}}"}</code>
+    </p>
   );
 }

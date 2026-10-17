@@ -18,6 +18,7 @@ export const triggerConfigSchema = z.object({
   trigger: z.enum([
     "LEAD_CREATED",
     "LEAD_STATUS_CHANGED",
+    "LEAD_SCORE_CHANGED",
     "DEAL_STAGE_CHANGED",
     "TASK_OVERDUE",
     "ACTIVITY_LOGGED",
@@ -26,7 +27,7 @@ export const triggerConfigSchema = z.object({
 
 export const conditionConfigSchema = z.object({
   field: z.string().trim().min(1, "Field is required (e.g. entity.score)"),
-  op: z.enum(["eq", "neq", "gte", "lte"]),
+  op: z.enum(["eq", "neq", "gte", "lte", "contains"]),
   value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
@@ -45,13 +46,20 @@ const updateLeadStatusConfigSchema = z.object({
   status: z.enum(["NEW", "CONTACTED", "QUALIFIED", "DISQUALIFIED", "CONVERTED"]),
 });
 
+const notifyOwnerConfigSchema = z.object({
+  action: z.literal("NOTIFY_OWNER"),
+  subject: z.string().trim().min(1, "Notification title is required").max(200),
+  message: z.string().trim().max(2000).optional().default(""),
+});
+
 export const actionStaticConfigSchema = z.discriminatedUnion("action", [
   createTaskConfigSchema,
   updateLeadStatusConfigSchema,
+  notifyOwnerConfigSchema,
 ]);
 
 export const actionAiConfigSchema = z.object({
-  instructions: z.string().trim().max(2000).optional().default(""),
+  instructions: z.string().trim().min(1, "Tell the AI what to write").max(2000),
 });
 
 export const NODE_CONFIG_SCHEMAS: Record<WorkflowNodeType, z.ZodTypeAny> = {
@@ -73,7 +81,7 @@ export function getDefaultConfig(type: WorkflowNodeType): Record<string, unknown
     case "ACTION_STATIC":
       return { action: "CREATE_TASK", title: "Follow up", priority: "MEDIUM" };
     case "ACTION_AI":
-      return { instructions: "" };
+      return { instructions: "Write a short, friendly follow-up email to {{contactName}}." };
   }
 }
 
@@ -121,7 +129,7 @@ export const NODE_TYPE_DEFS: Record<WorkflowNodeType, NodeTypeDef> = {
   ACTION_STATIC: {
     type: "ACTION_STATIC",
     label: "Action",
-    description: "Creates a task or updates a lead's status.",
+    description: "Creates a task, updates a lead's status, or notifies the owner in the Inbox.",
     icon: ListChecks,
     accent: "text-emerald-600 bg-emerald-50 border-emerald-200",
     implemented: true,
@@ -130,10 +138,10 @@ export const NODE_TYPE_DEFS: Record<WorkflowNodeType, NodeTypeDef> = {
   ACTION_AI: {
     type: "ACTION_AI",
     label: "AI Action",
-    description: "Coming soon — AI-driven actions are not runnable yet.",
+    description: "AI drafts a customer email for review (shows in the Inbox, never auto-sent).",
     icon: Sparkles,
-    accent: "text-ink-500 bg-surface-muted border-surface-border",
-    implemented: false,
+    accent: "text-fuchsia-600 bg-fuchsia-50 border-fuchsia-200",
+    implemented: true,
     isEntryPoint: false,
   },
 };

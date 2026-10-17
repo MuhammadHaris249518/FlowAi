@@ -88,7 +88,7 @@ def book_visit(customer_name: str, service: str, preferred_time: str, area: str,
     Jobs that need the owner's approval are refused unless owner_approved is true."""
     state = {
         "intent": "book", "service": service, "issue": None, "area": area, "preferred_time": preferred_time,
-        "caller_name": customer_name, "existing_appointment_ref": None, "owner_approved": owner_approved,
+        "caller_name": customer_name, "caller_phone": phone or None, "existing_appointment_ref": None, "owner_approved": owner_approved,
         "escalation": None, "turn_count": 0, "unclear_turns": 0, "status": "collecting",
         "idempotency_key": f"mcp_{int(time.time())}_{uuid.uuid4().hex[:6]}", "booking_result": None,
     }

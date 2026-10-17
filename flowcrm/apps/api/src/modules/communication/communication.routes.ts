@@ -7,4 +7,5 @@ export const communicationRouter = Router();
 
 communicationRouter.use(requireAuth());
 communicationRouter.get("/messages", asyncHandler(communicationController.listThread));
+communicationRouter.get("/inbox", asyncHandler(communicationController.listInbox));
 communicationRouter.post("/messages/:id/send", asyncHandler(communicationController.sendDraft));

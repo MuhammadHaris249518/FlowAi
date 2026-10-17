@@ -15,6 +15,13 @@ export const communicationController = {
     res.json({ success: true, data });
   },
 
+  async listInbox(req: Request, res: Response) {
+    if (!req.authContext) throw AppError.unauthorized();
+    const limit = Math.min(Number(req.query.limit) || 100, 200);
+    const data = await communicationService.listInbox(req.authContext, limit);
+    res.json({ success: true, data });
+  },
+
   async sendDraft(req: Request, res: Response) {
     if (!req.authContext) throw AppError.unauthorized();
     const data = await communicationService.sendDraft(req.authContext, req.params.id);

@@ -1,5 +1,6 @@
 import type { Prisma, DealLostReason } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { emitOutboxEvent } from "../../lib/outbox";
 import type { AuthContext } from "../../middleware/auth";
 import type { CreateDealInput, DealQuery, UpdateDealInput } from "./pipeline.validation";
 import type { DealStage } from "./pipeline.types";
@@ -135,16 +136,32 @@ export const pipelineRepository = {
     lostReason?: DealLostReason
   ) {
     const isClosedStage = stage === "WON" || stage === "LOST";
-    return prisma.deal.update({
-      where: { id },
-      data: {
-        stage,
-        closedAt: isClosedStage ? new Date() : null,
-        // Clear stale lostReason if the deal is reopened or won instead —
-        // mirrors the existing closedAt-clearing behavior above.
-        lostReason: stage === "LOST" ? lostReason : null,
-      },
-      include: dealInclude,
+    return prisma.$transaction(async (tx) => {
+      const previous = await tx.deal.findUnique({ where: { id }, select: { stage: true } });
+      const deal = await tx.deal.update({
+        where: { id },
+        data: {
+          stage,
+          closedAt: isClosedStage ? new Date() : null,
+          // Clear stale lostReason if the deal is reopened or won instead —
+          // mirrors the existing closedAt-clearing behavior above.
+          lostReason: stage === "LOST" ? lostReason : null,
+        },
+        include: dealInclude,
+      });
+      // Lets automation workflows react to pipeline moves (trigger DEAL_STAGE_CHANGED)
+      if (previous && previous.stage !== stage) {
+        await emitOutboxEvent(tx, {
+          organizationId: deal.organizationId,
+          type: "DEAL_STAGE_CHANGED",
+          payload: {
+            entityType: "Deal",
+            entityId: id,
+            entity: { fromStage: previous.stage, toStage: stage, value: Number(deal.value), title: deal.title },
+          },
+        });
+      }
+      return deal;
     });
   },
 

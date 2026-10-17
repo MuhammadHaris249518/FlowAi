@@ -47,6 +47,11 @@ export const communicationService = {
     return rows.map(toDTO);
   },
 
+  async listInbox(auth: AuthContext, limit: number): Promise<MessageDTO[]> {
+    const rows = await communicationRepository.listInbox(auth, limit);
+    return rows.map((m) => ({ ...toDTO(m), contactName: m.contact?.fullName ?? null }));
+  },
+
   // Sends an existing DRAFT message (e.g. the one an AI-drafted Task links
   // to). This is the ONLY send path — no free-form compose yet. Email-only
   // by product decision (SMS was removed — see docs/EXECUTION_PLAN.md).

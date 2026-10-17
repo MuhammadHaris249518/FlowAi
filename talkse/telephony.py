@@ -16,6 +16,7 @@ Telegram, safety alerts, FAQ learning and CRM sync.
 """
 
 import os
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FutureTimeout
 from xml.sax.saxutils import escape, quoteattr
 
 from fastapi import APIRouter, Form, HTTPException, Query
@@ -30,6 +31,18 @@ router = APIRouter(prefix="/voice")
 
 MAX_SILENT_TURNS = 2
 HOLD_SECONDS = 4
+# SignalWire drops a webhook after ~15 s, and one AI turn (LLM + DB) can take longer.
+# Each turn runs in a worker; if it isn't done within INLINE_WAIT_SECONDS the caller hears
+# "One moment" and SignalWire is redirected to /voice/reply, which picks up the result.
+INLINE_WAIT_SECONDS = 8
+_workers = ThreadPoolExecutor(max_workers=8, thread_name_prefix="voice-turn")
+_pending: dict[str, Future] = {}  # call_id -> turn still being processed (single instance)
+
+# Speech-recognition hints: services and cities the caller is likely to say
+HINTS = ", ".join(
+    [s["name"] for s in config.SERVICES] + list(config.CLINIC.get("service_area", []))
+    + ["AC", "air conditioner", "furnace", "water heater", "leak", "plumbing", "electrical", config.OWNER_NAME]
+)
 
 
 def _check_key(key: str | None) -> None:
@@ -63,7 +76,7 @@ def _gather(call_id: str, text: str, silent: int = 0) -> Response:
     fallback = escape(_url("turn", call_id=call_id, silent=silent + 1))
     return _xml(
         f'<Gather input="speech" action="{action}" method="POST" speechTimeout="auto" '
-        f'timeout="7" language="en-US">{_say(text)}</Gather>'
+        f'timeout="7" language="en-US" hints={quoteattr(HINTS)}>{_say(text)}</Gather>'
         f'<Redirect method="POST">{fallback}</Redirect>'
     )
 
@@ -98,10 +111,37 @@ def turn(call_id: str = Query(...), silent: int = Query(0), key: str | None = Qu
         if silent >= MAX_SILENT_TURNS:
             return _xml(f"{_say('I can not hear you, so I will end the call. Please call us back anytime.')}<Hangup/>")
         return _gather(call_id, "Sorry, I didn't catch that. Could you say it again?", silent)
+    if call_id in _pending:  # SignalWire retried while the previous turn is still running
+        return _await_turn(call_id, filler="")
+    _pending[call_id] = _workers.submit(call_engine.handle_text_turn, call_id, SpeechResult)
+    return _await_turn(call_id, filler="One moment.")
+
+
+@router.post("/reply")
+def reply(call_id: str = Query(...), key: str | None = Query(None)) -> Response:
+    """Follow-up for a slow turn: wait for the worker's result, then continue the conversation."""
+    _check_key(key)
+    if call_id not in _pending:
+        return _gather(call_id, "Sorry, could you say that again?")
+    return _await_turn(call_id, filler="")
+
+
+def _await_turn(call_id: str, filler: str) -> Response:
+    """Answer inline if the turn finishes in time, otherwise keep the line alive and come back."""
+    future = _pending[call_id]
     try:
-        result = call_engine.handle_text_turn(call_id, SpeechResult)
+        result = future.result(timeout=INLINE_WAIT_SECONDS)
+    except FutureTimeout:
+        again = escape(_url("reply", call_id=call_id))
+        return _xml(f'{_say(filler) if filler else ""}<Redirect method="POST">{again}</Redirect>')
     except KeyError:
+        _pending.pop(call_id, None)
         return _xml(f"{_say('Sorry, something went wrong with this call. Please call again.')}<Hangup/>")
+    except Exception as e:  # LLM/DB failure: let the caller repeat instead of dropping the call
+        print(f"[voice] turn failed for {call_id}: {e}")
+        _pending.pop(call_id, None)
+        return _gather(call_id, "Sorry, I had a problem there. Could you say that again?")
+    _pending.pop(call_id, None)
     return _respond(call_id, result["reply_text"], result["status"])
 
 

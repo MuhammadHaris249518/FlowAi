@@ -17,5 +17,6 @@ export interface MessageDTO {
   receivedAt: string | null;
   createdAt: string;
   attachments: MessageAttachmentDTO[];
+  contactName?: string | null;
 }
 

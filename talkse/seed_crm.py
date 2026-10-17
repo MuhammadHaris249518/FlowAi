@@ -8,6 +8,7 @@ IDs are fixed so the env vars are known in advance:
     CRM_ORG_ID=org_coolbreeze  CRM_OWNER_USER_ID=usr_haris  DEMO_CLERK_ID=demo_haris
 """
 
+import json
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -74,6 +75,57 @@ ACTIVITIES = [
     ("DEAL_STAGE_CHANGED", "AC Replacement · Olivia Nguyen moved to Negotiation", 20),
     ("MEETING_SCHEDULED", "Estimate visit scheduled with Olivia Nguyen", 26),
 ]
+
+
+# Ready-made automation workflows (active). Talkse calls emit LEAD_CREATED / DEAL_STAGE_CHANGED,
+# and moving a deal in the Pipeline emits DEAL_STAGE_CHANGED, so these run on real data.
+# (id, name, [(node id, type, config, x, y)], [(source, target, label)])
+WORKFLOWS = [
+    ("wf_hot_lead", "Hot caller lead → fast call-back", [
+        ("wn_hot_1", "TRIGGER", {"trigger": "LEAD_CREATED"}, 250, 0),
+        ("wn_hot_2", "CONDITION", {"field": "entity.score", "op": "gte", "value": "70"}, 250, 150),
+        ("wn_hot_3", "ACTION_STATIC", {"action": "CREATE_TASK", "title": "Call {{contactName}} to confirm the job details",
+                                        "priority": "HIGH"}, 250, 300),
+        ("wn_hot_4", "ACTION_STATIC", {"action": "NOTIFY_OWNER", "subject": "Hot lead: {{contactName}}",
+                                        "message": "A new lead scored {{leadScore}}/100 ({{leadSource}}). "
+                                                   "A call-back task was added to your Tasks."}, 250, 450),
+    ], [("wn_hot_1", "wn_hot_2", None), ("wn_hot_2", "wn_hot_3", "true"), ("wn_hot_3", "wn_hot_4", None)]),
+    ("wf_booking_email", "Booked visit → AI confirmation email", [
+        ("wn_bk_1", "TRIGGER", {"trigger": "DEAL_STAGE_CHANGED"}, 250, 0),
+        ("wn_bk_2", "CONDITION", {"field": "entity.toStage", "op": "eq", "value": "MEETING"}, 250, 150),
+        ("wn_bk_3", "ACTION_AI", {"instructions": "Write a warm confirmation email to {{contactName}} for their booked "
+                                                  "visit: {{dealTitle}}. Say the technician will call 30 minutes before "
+                                                  "arriving. Sign off as Cool Breeze Home Services."}, 250, 300),
+    ], [("wn_bk_1", "wn_bk_2", None), ("wn_bk_2", "wn_bk_3", "true")]),
+    ("wf_big_job", "High-value job → owner alert", [
+        ("wn_big_1", "TRIGGER", {"trigger": "DEAL_STAGE_CHANGED"}, 250, 0),
+        ("wn_big_2", "CONDITION", {"field": "entity.value", "op": "gte", "value": "1000"}, 250, 150),
+        ("wn_big_3", "ACTION_STATIC", {"action": "NOTIFY_OWNER", "subject": "High-value job ({{dealValue}})",
+                                        "message": "{{dealTitle}} is now in {{dealStage}}. "
+                                                   "Worth a personal call from the owner."}, 250, 300),
+    ], [("wn_big_1", "wn_big_2", None), ("wn_big_2", "wn_big_3", "true")]),
+]
+
+
+def seed_workflows(cur) -> None:
+    for wid, name, nodes, edges in WORKFLOWS:
+        cur.execute("""
+            INSERT INTO "Workflow" (id, name, "organizationId", "isActive", "updatedAt")
+            VALUES (%s, %s, %s, true, now())
+            ON CONFLICT DO NOTHING;
+        """, (wid, name, ORG_ID))
+        for nid, ntype, config, x, y in nodes:
+            cur.execute("""
+                INSERT INTO "WorkflowNode" (id, "workflowId", type, config, "positionX", "positionY")
+                VALUES (%s, %s, %s, %s::jsonb, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (nid, wid, ntype, json.dumps(config), x, y))
+        for i, (source, target, label) in enumerate(edges, start=1):
+            cur.execute("""
+                INSERT INTO "WorkflowEdge" (id, "workflowId", "sourceNodeId", "targetNodeId", label)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (f"{wid}_e{i}", wid, source, target, label))
 
 
 def reset() -> None:
@@ -157,6 +209,8 @@ def seed() -> None:
                     VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT DO NOTHING;
                 """, (f"ac_seed_{i:02d}", atype, message, ORG_ID, OWNER_ID, now - timedelta(hours=hours_ago)))
+
+            seed_workflows(cur)
         conn.commit()
         print(f"[Seed] FlowCRM demo data ready: org={ORG_ID} ({ORG_NAME}), owner={OWNER_ID}, clerkId={OWNER_CLERK_ID}")
     finally:
