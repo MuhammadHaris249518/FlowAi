@@ -82,6 +82,24 @@ class EmailChannel(Channel):
         email_notify.send_alert(text)
 
 
+class WhatsAppChannel(Channel):
+    """Owner's WhatsApp via Meta's Cloud API (whatsapp_notify.py): reply buttons for approvals.
+    On when WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID and OWNER_WHATSAPP are set."""
+    name = "whatsapp"
+
+    def enabled(self) -> bool:
+        import whatsapp_notify
+        return whatsapp_notify.enabled()
+
+    def send_escalation(self, escalation: dict, owner_console_url: str) -> None:
+        import whatsapp_notify
+        whatsapp_notify.send_escalation(escalation)
+
+    def send_alert(self, text: str) -> None:
+        import whatsapp_notify
+        whatsapp_notify.send_alert(text)
+
+
 class SmsChannel(Channel):
     """Slot for SMS (e.g. Twilio). On when SMS_PROVIDER_KEY and OWNER_PHONE are set."""
     name = "sms"
@@ -96,7 +114,7 @@ class SmsChannel(Channel):
         log.info("SMS channel not implemented yet; alert: %s", text)
 
 
-CHANNELS: list[Channel] = [ConsoleChannel(), EmailChannel(), TelegramChannel(), SmsChannel()]
+CHANNELS: list[Channel] = [ConsoleChannel(), EmailChannel(), WhatsAppChannel(), TelegramChannel(), SmsChannel()]
 
 
 def _owner_console_url() -> str:
