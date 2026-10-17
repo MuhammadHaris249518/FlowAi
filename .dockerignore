@@ -1,12 +1,11 @@
-# .dockerignore for the flowcrm-deploy branch (root context, builds flowcrm/ only)
+# The root Dockerfile builds only talkse/
 .env
 .git
 .venv/
-talkse/
+venv/
+flowcrm/
 docs/
-**/node_modules
-**/.next
-**/dist
-**/.env
-**/.env.local
-flowcrm/apps/ai-service
+**/__pycache__/
+**/*.pyc
+turns/
+*.wav
