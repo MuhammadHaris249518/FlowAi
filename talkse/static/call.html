@@ -699,7 +699,10 @@
     $("open-text").textContent = info.open_now ? "Open now" : "Closed now · AI still answers";
     $("hours-today").textContent = info.hours_today;
     $("local-time").textContent = `${info.local_time}${info.city ? " · " + info.city : ""}`;
-    $("phone").textContent = info.phone || "–";
+    // Real SignalWire number: tap to call the same AI receptionist from a phone
+    $("phone").innerHTML = info.phone
+      ? `<a href="tel:${info.phone.replace(/[^+\d]/g, "")}" style="color:inherit">${info.phone}</a>`
+      : "–";
     $("owner").textContent = `${info.owner} (${info.owner_title})`;
     $("area").innerHTML = "";
     (info.service_area || []).forEach(a => {
