@@ -104,7 +104,6 @@ function TriggerFields({ draft, commit }: { draft: Record<string, unknown>; comm
         <option value="LEAD_SCORE_CHANGED">A lead's AI score changes</option>
         <option value="DEAL_STAGE_CHANGED">A deal's stage changes (incl. AI receptionist bookings)</option>
         <option value="TASK_OVERDUE">A task becomes overdue</option>
-        <option value="ACTIVITY_LOGGED">An activity is logged</option>
       </select>
     </Field>
   );
@@ -272,7 +271,7 @@ function PlaceholderHint() {
   return (
     <p className="text-[11px] leading-relaxed text-ink-500">
       Placeholders: <code>{"{{contactName}}"}</code> <code>{"{{contactPhone}}"}</code> <code>{"{{dealTitle}}"}</code>{" "}
-      <code>{"{{dealValue}}"}</code> <code>{"{{dealStage}}"}</code> <code>{"{{leadScore}}"}</code> <code>{"{{leadSource}}"}</code>
+      <code>{"{{dealValue}}"}</code> <code>{"{{dealStage}}"}</code> <code>{"{{leadScore}}"}</code> <code>{"{{leadSource}}"}</code> <code>{"{{taskTitle}}"}</code> <code>{"{{taskDue}}"}</code>
     </p>
   );
 }

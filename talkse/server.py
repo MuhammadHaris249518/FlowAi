@@ -10,6 +10,9 @@ import json
 from html import escape as html_escape
 import logging
 import os
+import threading
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -69,6 +72,17 @@ class McpKeyGuard:
         await self.app(scope, receive, send)
 
 
+def _sweep_loop(stop: threading.Event) -> None:
+    """Every minute: finalize abandoned calls so no lead or owner request is left hanging."""
+    while not stop.wait(60):
+        try:
+            handed = call_engine.sweep_abandoned_calls()
+            if handed:
+                log.info("Sweeper: %d abandoned call(s) handed to the owner", handed)
+        except Exception as e:
+            log.error("Sweeper failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not db.DATABASE_URL.startswith(("postgres://", "postgresql://")):
@@ -79,11 +93,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         # Keep serving /health and the page so the Logs tab shows the real problem
         log.error("Database init failed: %s", e)
+    sweeper_stop = threading.Event()
+    threading.Thread(target=_sweep_loop, args=(sweeper_stop,), daemon=True, name="call-sweeper").start()
     telegram_stop = telegram_bot.start_polling()
     if telegram_bot.token() and not telegram_bot.owner_chat():
         log.warning("TELEGRAM_OWNER_CHAT_ID not set: send /start to the bot to get your chat ID")
     async with mcp_server.mcp.session_manager.run():
         yield
+    sweeper_stop.set()
     if telegram_stop:
         telegram_stop.set()
 
@@ -171,14 +188,43 @@ def info() -> dict:
     }
 
 
+class RateLimiter:
+    """In-memory sliding window per client IP (one instance). Stops bots burning Groq/Deepgram credit."""
+
+    def __init__(self, limit: int, window_seconds: int):
+        self.limit, self.window = limit, window_seconds
+        self.hits: dict[str, deque] = defaultdict(deque)
+        self.lock = threading.Lock()
+
+    def check(self, request: Request) -> None:
+        # Behind Cloudflare / the platform proxy the real client is in these headers
+        ip = (request.headers.get("cf-connecting-ip")
+              or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+              or (request.client.host if request.client else "unknown"))
+        now = time.monotonic()
+        with self.lock:
+            q = self.hits[ip]
+            while q and now - q[0] > self.window:
+                q.popleft()
+            if len(q) >= self.limit:
+                raise HTTPException(status_code=429, detail="Too many requests, please wait a few minutes")
+            q.append(now)
+
+
+CALL_LIMIT = RateLimiter(int(os.getenv("RATE_CALLS_PER_HOUR", "20")), 3600)      # new browser calls per IP
+TURN_LIMIT = RateLimiter(int(os.getenv("RATE_TURNS_PER_10MIN", "120")), 600)     # spoken turns per IP
+
+
 @app.post("/api/calls")
-def start_call(body: StartCallRequest | None = None) -> dict:
+def start_call(request: Request, body: StartCallRequest | None = None) -> dict:
+    CALL_LIMIT.check(request)
     call_id, greeting = call_engine.start_call(body.caller_phone if body else None)
     return {"call_id": call_id, "reply_text": greeting, "audio_b64": tts_b64(greeting), "status": call_engine.COLLECTING}
 
 
 @app.post("/api/calls/{call_id}/turn")
-def call_turn(call_id: str, audio: UploadFile = File(...)) -> dict:
+def call_turn(call_id: str, request: Request, audio: UploadFile = File(...)) -> dict:
+    TURN_LIMIT.check(request)
     data = audio.file.read(MAX_AUDIO_BYTES + 1)
     if len(data) > MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="Recording is too long")

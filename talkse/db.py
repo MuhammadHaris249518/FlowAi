@@ -1,7 +1,9 @@
 import os
 import json
+import threading
 import time
 import psycopg2
+from psycopg2 import extensions, pool
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
@@ -10,7 +12,20 @@ load_dotenv()
 DEFAULT_DB_URL = "postgresql://postgres:postgres@localhost:5433/postgres"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
-def get_connection():
+# Connection pool: a turn runs ~6 queries, and a fresh TLS connection to Neon costs far more
+# than the query itself. Callers keep the same API (get_connection() ... conn.close());
+# close() hands the connection back to the pool instead of closing it.
+# psycopg2's pool closes returned connections once it holds `minconn` idle ones, so minconn is
+# how many stay open between queries (not just a starting size)
+_POOL_MIN = int(os.getenv("DB_POOL_MIN", "3"))
+_POOL_MAX = int(os.getenv("DB_POOL_MAX", "8"))
+_REVALIDATE_AFTER = 60  # seconds idle before a pooled connection is checked with SELECT 1
+_pool: pool.ThreadedConnectionPool | None = None
+_pool_lock = threading.Lock()
+_last_used: dict[int, float] = {}
+
+
+def _connect():
     # One retry: Neon can drop the first connection while its compute wakes up from idle
     try:
         return psycopg2.connect(DATABASE_URL, connect_timeout=10)
@@ -18,6 +33,74 @@ def get_connection():
         print(f"[DB] Connection failed ({e}); retrying once...")
         time.sleep(1)
         return psycopg2.connect(DATABASE_URL, connect_timeout=10)
+
+
+class _PooledConnection:
+    """A pooled psycopg2 connection whose close() returns it to the pool (rolled back, clean)."""
+
+    def __init__(self, conn, owner):
+        self._conn = conn
+        self._pool = owner
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def close(self):
+        conn, self._conn = self._conn, None
+        if conn is None:
+            return
+        try:
+            broken = bool(conn.closed)
+            if not broken and conn.get_transaction_status() != extensions.TRANSACTION_STATUS_IDLE:
+                conn.rollback()
+            _last_used[id(conn)] = time.monotonic()
+            self._pool.putconn(conn, close=broken)
+        except Exception:
+            try:
+                self._pool.putconn(conn, close=True)
+            except Exception:
+                pass
+
+
+def _get_pool() -> pool.ThreadedConnectionPool | None:
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                try:
+                    _pool = pool.ThreadedConnectionPool(_POOL_MIN, _POOL_MAX, DATABASE_URL, connect_timeout=10)
+                except Exception as e:
+                    print(f"[DB] Pool unavailable ({e}); using direct connections")
+                    return None
+    return _pool
+
+
+def get_connection():
+    p = _get_pool()
+    if p is None:
+        return _connect()
+    for _ in range(2):
+        try:
+            conn = p.getconn()
+        except pool.PoolError:
+            return _connect()  # pool exhausted (many threads at once): a plain connection, closed after use
+        except psycopg2.OperationalError:
+            return _connect()
+        try:
+            # Neon closes idle connections server-side: check one that sat unused for a while
+            if conn.closed:
+                raise psycopg2.OperationalError("closed")
+            if time.monotonic() - _last_used.get(id(conn), 0) > _REVALIDATE_AFTER:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                conn.rollback()
+            return _PooledConnection(conn, p)
+        except Exception:
+            try:
+                p.putconn(conn, close=True)
+            except Exception:
+                pass
+    return _connect()
 
 def init_db():
     """Initializes the appointments table and unique slot index in Postgres."""
@@ -101,6 +184,8 @@ def init_db():
                     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
             """)
+            # Last activity on a call: lets the sweeper finalize calls the caller abandoned
+            cur.execute("ALTER TABLE talkse.calls ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();")
             conn.commit()
             print("[DB] Initialized talkse schema (appointments, calls, escalations, faqs).")
     finally:
@@ -385,7 +470,9 @@ def update_call(call_id: str, state: dict, new_turns: list[dict] = None) -> dict
                 SET state_json = %s,
                     status = %s,
                     caller_name = COALESCE(%s, caller_name),
+                    caller_phone = COALESCE(caller_phone, %s),
                     transcript = transcript || %s::jsonb,
+                    updated_at = now(),
                     ended_at = CASE WHEN %s AND ended_at IS NULL THEN now() ELSE ended_at END
                 WHERE id::text = %s
                 RETURNING *;
@@ -393,6 +480,7 @@ def update_call(call_id: str, state: dict, new_turns: list[dict] = None) -> dict
                 json.dumps(state, default=str),
                 state.get("status", "collecting"),
                 state.get("caller_name"),
+                state.get("caller_phone"),
                 json.dumps(new_turns or []),
                 terminal,
                 str(call_id),
@@ -400,6 +488,22 @@ def update_call(call_id: str, state: dict, new_turns: list[dict] = None) -> dict
             row = cur.fetchone()
             conn.commit()
             return dict(row) if row else None
+    finally:
+        conn.close()
+
+def list_stale_calls(idle_minutes: int = 10) -> list[dict]:
+    """Calls still open (collecting / on hold) with no activity for idle_minutes: abandoned by the caller."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT * FROM talkse.calls
+                WHERE status IN ('collecting', 'waiting_human')
+                  AND updated_at < now() - make_interval(mins => %s)
+                ORDER BY updated_at
+                LIMIT 50;
+            """, (idle_minutes,))
+            return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
 

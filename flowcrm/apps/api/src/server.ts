@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { startOutboxPoller } from "./modules/automation/automation.outbox-poller";
 import { startResumePoller } from "./modules/automation/automation.resume-poller";
 import { startAiPoller } from "./modules/automation/automation.ai-poller";
+import { startOverduePoller } from "./modules/automation/automation.overdue-poller";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
@@ -12,5 +13,6 @@ app.listen(PORT, () => {
   startOutboxPoller();
   startResumePoller();
   startAiPoller();
+  startOverduePoller();
 });
 

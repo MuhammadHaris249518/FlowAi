@@ -16,13 +16,17 @@ def check_emergency_protocol(text: str) -> str | None:
     if not text:
         return None
     lower = text.lower()
-    emergency_keywords = config.EMERGENCY_PROTOCOL.get("keywords") or [
+    # "my smoke detector keeps beeping" is a low battery, not a fire: don't trigger on maintenance chirps
+    maintenance = (re.search(r"\b(smoke|co|carbon monoxide)\s+(detector|alarm)s?\b", lower)
+                   and re.search(r"\b(beep\w*|chirp\w*|batter(y|ies)|replace|install\w*)\b", lower)
+                   and not re.search(r"\b(fire|flames?|burning|smell\w*)\b", lower))
+    emergency_keywords = [] if maintenance else config.EMERGENCY_PROTOCOL.get("keywords") or [
         "difficulty breathing", "can't breathe", "cannot breathe",
         "severe swelling", "swelling up", "chest pain",
         "anaphylaxis", "allergic reaction"
     ]
     for kw in emergency_keywords:
-        if kw in lower:
+        if re.search(rf"\b{re.escape(kw)}\b", lower):
             return (
                 config.EMERGENCY_PROTOCOL.get("caller_instructions")
                 or config.EMERGENCY_PROTOCOL.get(
@@ -64,8 +68,9 @@ def check_owner_approval(service: dict | None, transcript: str, area: str | None
         return f"{service['name']} is above our ${threshold:,} approval limit"
 
     lower = (transcript or "").lower()
+    lower = re.sub(r"\b(home office|office hours|post office|at the store|from the store|store[- ]bought)\b", " ", lower)
     for kw in rules.get("keywords", []):
-        if kw in lower:
+        if re.search(rf"\b{re.escape(kw)}\b", lower):
             return f"it sounds like a {kw} job, and {config.OWNER_NAME} reviews those personally"
 
     if not is_in_service_area(area):
@@ -111,8 +116,13 @@ def parse_time_string(time_str: str) -> datetime | None:
     try:
         dt = parser.parse(time_str, fuzzy=True, default=default)
     except Exception:
-        # Unparseable: tomorrow at 14:00
-        dt = (now + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0, tzinfo=None)
+        return None  # unparseable ("sometime soon"): the caller is asked again, never booked at a guessed time
+    # fuzzy parsing can return the default untouched for text with no date/time at all
+    has_time_words = re.search(r"\d|tomorrow|today|tonight|morning|afternoon|evening|noon|"
+                               r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+                               r"jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec", time_str.lower())
+    if not has_time_words:
+        return None
     dt = dt.replace(tzinfo=config.TZ)
 
     # Move times in the past into the future
@@ -184,8 +194,9 @@ def book_appointment(state: dict, idempotency_key: str) -> dict:
         }
 
     # 4. Resolve requested time
-    time_input = state.get("preferred_time") or "tomorrow at 2pm"
-    requested_start = parse_time_string(time_input)
+    requested_start = parse_time_string(state.get("preferred_time") or "")
+    if requested_start is None:
+        return {"status": "rejected", "reason": "Sorry, I didn't catch the day and time."}
 
     # 5. First provider free at exactly that time; otherwise the original rule:
     #    first provider, moved to their next working day
@@ -254,6 +265,8 @@ def reschedule_appointment(existing_ref: str, new_time_str: str) -> dict:
     provider = config.get_provider(appt["provider_id"])
     
     new_start = parse_time_string(new_time_str)
+    if new_start is None:
+        return {"status": "rejected", "reason": "Sorry, I didn't catch the new day and time."}
     
     # Check availability for new time
     available, reason = is_slot_available(provider["id"], service["id"], new_start, exclude_appt_id=str(appt["id"]))

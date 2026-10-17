@@ -71,6 +71,8 @@ def check_availability(service: str, preferred_time: str, area: str = "") -> dic
     if not svc:
         return {"available": False, "reason": f"Unknown service '{service}'"}
     start = be.parse_time_string(preferred_time)
+    if start is None:
+        return {"available": False, "reason": f"Couldn't understand the time '{preferred_time}'. Try e.g. 'Thursday at 10 AM'."}
     approval = be.check_owner_approval(svc, service, area or None)
     for tech in config.providers_for_service(svc["id"]):
         ok, reason = be.is_slot_available(tech["id"], svc["id"], start)
@@ -102,8 +104,11 @@ def book_visit(customer_name: str, service: str, preferred_time: str, area: str,
         "idempotency_key": f"mcp_{int(time.time())}_{uuid.uuid4().hex[:6]}", "booking_result": None,
         "channel": "mcp", "mcp_booking": booking,
     }
+    start = be.parse_time_string(preferred_time)
+    if start is None:
+        return {"booked": False, "reason": f"Couldn't understand the time '{preferred_time}'. Try e.g. 'Thursday at 10 AM'."}
     # Idempotent: an LLM client may call book_visit twice for one request; return the existing booking
-    existing = db.find_booking(customer_name, be.parse_time_string(preferred_time))
+    existing = db.find_booking(customer_name, start)
     if existing:
         tech = config.get_provider(existing["provider_id"])
         return {"booked": True, "already_booked": True,
@@ -192,8 +197,14 @@ def list_owner_requests(only_pending: bool = True) -> list[dict]:
 
 @mcp.tool()
 def answer_owner_request(request_id: str, choice: str = "", answer_text: str = "", save_as_faq: bool = False) -> dict:
-    """Answer a pending owner request on the owner's behalf. choice: approve | site_visit | callback;
-    or answer_text for a caller question (save_as_faq=true teaches the AI that answer)."""
+    """Answer a caller's pending QUESTION with answer_text (save_as_faq=true teaches the AI that answer).
+    Job approvals can't be decided here: only the owner approves, from the owner console or the approval email."""
+    esc = db.get_escalation(request_id)
+    if not esc:
+        return {"ok": False, "error": "Request not found"}
+    if esc["kind"] == "approval":
+        return {"ok": False, "error": f"Approvals must come from {config.OWNER_NAME} himself "
+                                      "(owner console or the approval email), not from an AI assistant."}
     return handoff.answer_escalation(request_id, choice=choice or None, text=answer_text or None,
                                      save_as_faq=save_as_faq)
 

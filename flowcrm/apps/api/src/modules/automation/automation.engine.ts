@@ -104,6 +104,16 @@ async function loadPlaceholders(context: Record<string, unknown>): Promise<Recor
       leadSource: lead?.source ?? "",
       contactId: lead?.contactId ?? "",
     });
+  } else if (context.entityType === "Task") {
+    const task = await prisma.task.findFirst({ where: { id: entityId, organizationId }, include: { contact: true } });
+    Object.assign(out, {
+      taskTitle: task?.title ?? "",
+      taskPriority: task?.priority ?? "",
+      taskDue: task?.dueAt ? task.dueAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "",
+      contactName: task?.contact?.fullName ?? "the customer",
+      contactPhone: task?.contact?.phone ?? "",
+      contactId: task?.contactId ?? "",
+    });
   } else if (context.entityType === "Deal") {
     const deal = await prisma.deal.findFirst({ where: { id: entityId, organizationId }, include: { contact: true } });
     Object.assign(out, {
