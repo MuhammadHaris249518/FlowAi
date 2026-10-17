@@ -1,6 +1,6 @@
-import { Bell, Search } from "lucide-react";
+import { Bell, PhoneCall, Search } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
-import { DEMO_MODE, DEMO_USER } from "@/lib/demo";
+import { DEMO_MODE, DEMO_USER, TALKSE_URL } from "@/lib/demo";
 
 export function Topbar({ title }: { title: string }) {
   return (
@@ -12,6 +12,15 @@ export function Topbar({ title }: { title: string }) {
           <Search className="h-4 w-4" aria-hidden />
           <span>Search anything...</span>
         </div>
+        <a
+          href={TALKSE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-500 to-cyan-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+        >
+          <PhoneCall className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">Voice Agent</span>
+        </a>
         <button aria-label="Notifications" className="text-ink-500 hover:text-ink-900">
           <Bell className="h-5 w-5" aria-hidden />
         </button>

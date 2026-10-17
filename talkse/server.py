@@ -104,11 +104,33 @@ def index() -> FileResponse:
 
 @app.get("/api/info")
 def info() -> dict:
-    """Business name and phone for the call page header."""
+    """Business details for the call page: name, owner, today's hours, services, service area."""
+    clinic = clinic_config.CLINIC
+    now = clinic_config.now()
+    today = clinic.get("hours", {}).get(now.strftime("%A").lower(), {})
+    address = clinic.get("address", {})
     return {
-        "name": clinic_config.CLINIC.get("name", "Talkse"),
-        "tagline": clinic_config.CLINIC.get("tagline", ""),
+        "name": clinic.get("name", "Talkse"),
+        "tagline": clinic.get("tagline", ""),
         "owner": clinic_config.OWNER_NAME,
+        "owner_title": clinic.get("owner", {}).get("title", "Owner"),
+        "phone": clinic.get("phone"),
+        "emergency_line": clinic.get("after_hours_emergency_line"),
+        "city": ", ".join(p for p in (address.get("city"), address.get("state")) if p),
+        "timezone": clinic.get("timezone"),
+        "local_time": now.strftime("%a %I:%M %p").replace(" 0", " "),
+        "open_now": clinic_config.is_clinic_open(now),
+        "hours_today": "Closed today" if today.get("closed") or not today.get("open")
+        else f"{today['open']}–{today['close']}",
+        "service_area": clinic.get("service_area", []),
+        "payment_methods": clinic.get("accepted_payment_methods", []),
+        "services": [
+            {"name": s["name"], "price_usd": s.get("price_usd"), "description": s.get("description", ""),
+             "needs_approval": bool(s.get("approval_required"))}
+            for s in clinic_config.SERVICES
+        ],
+        "technicians": [{"name": p["name"], "title": p.get("title", "")} for p in clinic_config.PROVIDERS],
+        "crm_url": os.getenv("FLOWCRM_URL") or None,
     }
 
 

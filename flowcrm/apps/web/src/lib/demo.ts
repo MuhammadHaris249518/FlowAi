@@ -4,3 +4,7 @@
 export const DEMO_MODE = process.env.NEXT_PUBLIC_AUTH_MODE === "demo";
 
 export const DEMO_USER = { name: "Haris", role: "Owner", initials: "H" };
+
+// Talkse AI voice receptionist (separate service). Baked in at build time.
+export const TALKSE_URL = (process.env.NEXT_PUBLIC_TALKSE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+export const TALKSE_OWNER_URL = `${TALKSE_URL}/owner`;

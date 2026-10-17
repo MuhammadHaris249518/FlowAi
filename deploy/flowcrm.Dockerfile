@@ -21,6 +21,7 @@ RUN cd apps/api && npm run build
 # Baked into the web bundle at build time: same-origin API + no Clerk login
 ENV NEXT_PUBLIC_API_URL=/api/v1 \
     NEXT_PUBLIC_AUTH_MODE=demo \
+    NEXT_PUBLIC_TALKSE_URL=https://alternate-vivid-tower-7542-github-app.alternatefutures.ai \
     NEXT_TELEMETRY_DISABLED=1
 RUN cd apps/web && npx next build
 

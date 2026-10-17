@@ -38,7 +38,8 @@ def main() -> None:
         python = os.path.join(ROOT, ".venv", "Scripts", "python.exe")
         if not os.path.exists(python):
             python = sys.executable
-        cmd, cwd, extra = f'"{python}" -m uvicorn server:app --port 8000', "talkse", {}
+        cmd, cwd = f'"{python}" -m uvicorn server:app --port 8000', "talkse"
+        extra = {"FLOWCRM_URL": env.get("FLOWCRM_URL", "http://localhost:3000")}
     elif which == "api":
         cmd, cwd = "npx ts-node-dev --transpile-only src/server.ts", os.path.join("flowcrm", "apps", "api")
         extra = {**flowcrm_db, "PORT": "4000", "AUTH_MODE": "demo",
@@ -46,7 +47,8 @@ def main() -> None:
                  "DEMO_ORG_ID": env.get("DEMO_ORG_ID", env.get("CRM_ORG_ID", "org_coolbreeze"))}
     elif which == "web":
         cmd, cwd = "npx next dev -p 3000", os.path.join("flowcrm", "apps", "web")
-        extra = {"NEXT_PUBLIC_AUTH_MODE": "demo", "NEXT_PUBLIC_API_URL": "http://localhost:4000/api/v1"}
+        extra = {"NEXT_PUBLIC_AUTH_MODE": "demo", "NEXT_PUBLIC_API_URL": "http://localhost:4000/api/v1",
+                 "NEXT_PUBLIC_TALKSE_URL": "http://localhost:8000"}
     else:
         print(__doc__)
         sys.exit(1)
