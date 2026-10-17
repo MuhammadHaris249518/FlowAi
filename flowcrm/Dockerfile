@@ -42,6 +42,8 @@ COPY --from=builder /app/apps/api/package*.json ./api/apps/api/
 COPY --from=builder /app/apps/api/src/prisma ./api/apps/api/src/prisma
 
 COPY start.sh ./start.sh
+# Strip Windows line endings: a CRLF start.sh fails under Linux sh ("\r: not found")
+RUN sed -i 's/\r$//' ./start.sh
 
 # Must match the PORT set in the Alternate Clouds Source tab (else 502 Bad Gateway)
 ENV PORT=3000 \
