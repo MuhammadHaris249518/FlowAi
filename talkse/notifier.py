@@ -4,7 +4,7 @@ Channels are pluggable: each one says whether it is configured (env vars) and ho
 send. The owner console (/owner) always works because it reads the escalations table
 directly; channels here only *push* a notification.
 
-Adding a channel (SMS, email, Slack...; Telegram is in telegram_bot.py):
+Adding a channel (SMS, Slack...; Telegram is in telegram_bot.py, email in email_notify.py):
     1. Subclass Channel, implement enabled() / send_escalation() / send_alert().
     2. Add an instance to CHANNELS.
     3. If the channel can answer (e.g. Telegram buttons), call
@@ -64,6 +64,24 @@ class TelegramChannel(Channel):
         telegram_bot.send_alert(text)
 
 
+class EmailChannel(Channel):
+    """Owner's inbox via Resend (email_notify.py): approval buttons are signed one-click links.
+    On when RESEND_API_KEY and OWNER_EMAIL are set."""
+    name = "email"
+
+    def enabled(self) -> bool:
+        import email_notify
+        return email_notify.enabled()
+
+    def send_escalation(self, escalation: dict, owner_console_url: str) -> None:
+        import email_notify
+        email_notify.send_escalation(escalation)
+
+    def send_alert(self, text: str) -> None:
+        import email_notify
+        email_notify.send_alert(text)
+
+
 class SmsChannel(Channel):
     """Slot for SMS (e.g. Twilio). On when SMS_PROVIDER_KEY and OWNER_PHONE are set."""
     name = "sms"
@@ -78,7 +96,7 @@ class SmsChannel(Channel):
         log.info("SMS channel not implemented yet; alert: %s", text)
 
 
-CHANNELS: list[Channel] = [ConsoleChannel(), TelegramChannel(), SmsChannel()]
+CHANNELS: list[Channel] = [ConsoleChannel(), EmailChannel(), TelegramChannel(), SmsChannel()]
 
 
 def _owner_console_url() -> str:
