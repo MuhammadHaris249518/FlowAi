@@ -16,8 +16,12 @@ import {
   Inbox,
   FileText,
   Settings,
+  PhoneCall,
+  UserCheck,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TALKSE_URL, TALKSE_OWNER_URL } from "@/lib/demo";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -67,6 +71,31 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Talkse AI receptionist (separate service): calls land in this CRM automatically */}
+      <div className="border-t border-surface-border p-3">
+        <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">AI Receptionist</p>
+        <a
+          href={TALKSE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:bg-surface-muted hover:text-ink-900"
+        >
+          <PhoneCall className="h-4 w-4 text-brand-500" aria-hidden />
+          Voice Agent
+          <ExternalLink className="ml-auto h-3.5 w-3.5" aria-hidden />
+        </a>
+        <a
+          href={TALKSE_OWNER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:bg-surface-muted hover:text-ink-900"
+        >
+          <UserCheck className="h-4 w-4 text-brand-500" aria-hidden />
+          Owner Console
+          <ExternalLink className="ml-auto h-3.5 w-3.5" aria-hidden />
+        </a>
+      </div>
     </aside>
   );
 }

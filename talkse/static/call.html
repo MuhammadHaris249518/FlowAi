@@ -3,127 +3,505 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Talkse Call</title>
+<title>AI Receptionist · Talkse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #667085;
-    --accent: #1565c0; --accent-text: #ffffff; --caller: #e8f0fe; --ai: #f1f3f5;
-    --danger: #c62828; --border: #e4e7ec;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f1115; --card: #171a21; --text: #eceef2; --muted: #98a2b3;
-      --accent: #4c8dff; --accent-text: #0f1115; --caller: #1d2a44; --ai: #22262f;
-      --danger: #ef5350; --border: #2a2f3a;
-    }
+    --bg: #070b14; --bg2: #0d1424; --panel: rgba(255,255,255,0.045); --panel-border: rgba(255,255,255,0.09);
+    --text: #e8edf7; --muted: #8b97ad; --faint: #5d6880;
+    --accent: #4f8cff; --accent2: #22d3ee; --good: #34d399; --warn: #fbbf24; --danger: #f87171;
+    --caller: rgba(79,140,255,0.16); --ai: rgba(255,255,255,0.06);
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; color: var(--text); background: var(--bg);
+    background-image:
+      radial-gradient(900px 600px at 50% -10%, rgba(79,140,255,0.18), transparent 60%),
+      radial-gradient(700px 500px at 100% 100%, rgba(34,211,238,0.08), transparent 60%),
+      radial-gradient(600px 500px at 0% 80%, rgba(139,92,246,0.08), transparent 60%);
+    font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 40px; }
-  header h1 { margin: 0; font-size: 22px; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 16px; margin-top: 16px;
+  a { color: inherit; }
+
+  /* ---- Header ---- */
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    max-width: 1280px; margin: 0 auto; padding: 18px 24px;
   }
-  #status { color: var(--muted); font-size: 14px; min-height: 20px; display: flex; align-items: center; gap: 8px; }
-  #status.error { color: var(--danger); }
-  .spinner {
-    width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent);
-    border-radius: 50%; animation: spin .8s linear infinite; display: none;
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04101f;
+    box-shadow: 0 8px 24px rgba(79,140,255,0.35);
   }
-  .busy .spinner { display: inline-block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #chat { display: flex; flex-direction: column; gap: 8px; min-height: 120px; max-height: 50vh; overflow-y: auto; }
-  .bubble { padding: 10px 12px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; }
-  .bubble.caller { background: var(--caller); align-self: flex-end; }
-  .bubble.assistant { background: var(--ai); align-self: flex-start; }
-  .empty { color: var(--muted); font-size: 14px; text-align: center; margin: auto; }
-  .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 20px; }
+  .brand h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .nav { display: flex; gap: 8px; flex-wrap: wrap; }
+  .nav a {
+    text-decoration: none; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+    transition: background .15s, border-color .15s;
+  }
+  .nav a:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+
+  /* ---- Layout ---- */
+  main {
+    max-width: 1280px; margin: 0 auto; padding: 4px 24px 40px;
+    display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 20px; align-items: start;
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 18px; padding: 18px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .panel + .panel { margin-top: 16px; }
+  .panel h2 { margin: 0 0 12px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ---- Business card ---- */
+  .biz-name { font-size: 18px; font-weight: 600; margin: 0 0 2px; letter-spacing: -0.01em; }
+  .biz-tag { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  .badge.open { background: rgba(52,211,153,0.12); color: var(--good); }
+  .badge.closed { background: rgba(248,113,113,0.12); color: var(--danger); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .facts { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 10px; font-size: 13.5px; }
+  .facts li { display: flex; justify-content: space-between; gap: 10px; }
+  .facts span:first-child { color: var(--muted); }
+  .facts span:last-child { text-align: right; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: #c9d3e6; }
+  .tech { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600;
+    background: linear-gradient(135deg, rgba(79,140,255,0.35), rgba(34,211,238,0.25)); color: #dbe7ff;
+  }
+  .tech small { display: block; color: var(--muted); font-size: 12px; }
+  .alert {
+    border: 1px solid rgba(248,113,113,0.35); background: rgba(248,113,113,0.08); color: #fecaca;
+    border-radius: 14px; padding: 12px 14px; font-size: 13px;
+  }
+  .alert strong { color: #fff; display: block; margin-bottom: 2px; }
+
+  /* ---- Center stage ---- */
+  .stage { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18px 18px 22px; }
+  .stage-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .live.on .dot { background: var(--good); box-shadow: 0 0 0 0 rgba(52,211,153,0.6); animation: ping 1.6s infinite; }
+  @keyframes ping { to { box-shadow: 0 0 0 10px rgba(52,211,153,0); } }
+  .timer { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--muted); }
+  .orb-wrap { position: relative; width: min(380px, 78vw); aspect-ratio: 1; margin: 6px 0 4px; }
+  #orb { width: 100%; height: 100%; display: block; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .orb-hint {
+    position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); font-size: 12px; color: var(--muted);
+    pointer-events: none; white-space: nowrap;
+  }
+  .state { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; margin: 4px 0 2px; min-height: 32px; }
+  .substate { color: var(--muted); font-size: 14px; min-height: 22px; margin: 0 0 18px; }
+  .substate.error { color: var(--danger); }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   button {
-    font: inherit; border: none; border-radius: 999px; cursor: pointer;
-    background: var(--accent); color: var(--accent-text);
+    font: inherit; font-weight: 600; border: none; cursor: pointer; border-radius: 14px; padding: 13px 24px;
+    transition: transform .08s, filter .15s, opacity .15s;
   }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  #start { padding: 12px 28px; font-weight: 600; }
-  #talk {
-    width: 132px; height: 132px; font-weight: 600; font-size: 17px;
-    user-select: none; -webkit-user-select: none; touch-action: none;
-    transition: transform .1s;
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #6d7bff); color: #fff; box-shadow: 0 10px 30px rgba(79,140,255,0.35); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn-danger { background: rgba(248,113,113,0.14); color: #fecaca; border: 1px solid rgba(248,113,113,0.35); }
+  .btn-ghost { background: var(--panel); color: var(--text); border: 1px solid var(--panel-border); touch-action: none; user-select: none; -webkit-user-select: none; }
+  .btn-ghost.recording { background: rgba(52,211,153,0.16); border-color: rgba(52,211,153,0.5); color: #bbf7d0; }
+  .steps { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .step { font-size: 12px; padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--faint); border: 1px solid transparent; transition: all .2s; }
+  .step.active { color: var(--text); border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); }
+  .kbd { font-size: 12px; color: var(--faint); margin-top: 12px; }
+  kbd { font: 600 11px/1 Inter, sans-serif; padding: 3px 6px; border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid var(--panel-border); }
+
+  /* ---- Services ---- */
+  .services { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .svc { padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); }
+  .svc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .svc-name { font-weight: 600; font-size: 13.5px; }
+  .svc-price { font-size: 13px; color: var(--accent2); font-weight: 600; white-space: nowrap; }
+  .svc p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+  .owner-tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--warn); }
+
+  /* ---- How it works ---- */
+  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .how div { padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.035); font-size: 12.5px; color: var(--muted); }
+  .how b { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+
+  /* ---- Transcript ---- */
+  .transcript { display: flex; flex-direction: column; gap: 10px; height: 430px; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
+  .transcript::-webkit-scrollbar { width: 6px; }
+  .transcript::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 6px; }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 14px; animation: rise .25s ease-out; }
+  .msg small { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
+  .msg.caller { align-self: flex-end; background: var(--caller); border-bottom-right-radius: 4px; }
+  .msg.assistant { align-self: flex-start; background: var(--ai); border-bottom-left-radius: 4px; }
+  .msg.system { align-self: center; background: rgba(251,191,36,0.1); color: #fde68a; font-size: 12.5px; text-align: center; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .empty { margin: auto; text-align: center; color: var(--faint); font-size: 13.5px; padding: 20px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .meta div { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.035); }
+  .meta small { display: block; color: var(--muted); font-size: 11.5px; }
+  .meta b { font-size: 14px; font-weight: 600; }
+  footer { text-align: center; color: var(--faint); font-size: 12.5px; padding: 0 24px 28px; }
+
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; }
+    .col-center { order: -1; }
+    .transcript { height: 320px; }
   }
-  #talk.recording { background: var(--danger); transform: scale(1.06); }
-  .hint { color: var(--muted); font-size: 13px; text-align: center; }
+  @media (max-width: 560px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .how { grid-template-columns: 1fr; }
+    .state { font-size: 19px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .live.on .dot { animation: none; } }
 </style>
 </head>
 <body>
+<header>
+  <div class="brand">
+    <div class="logo">T</div>
+    <div>
+      <h1 id="biz-header">AI Receptionist</h1>
+      <p>Powered by Talkse · human-in-the-loop voice agent</p>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="/owner" target="_blank" rel="noopener">Owner console</a>
+    <a id="crm-link" href="#" target="_blank" rel="noopener" hidden>Open CRM</a>
+  </nav>
+</header>
+
 <main>
-  <header>
-    <h1 id="biz-name">Talkse</h1>
-    <p id="biz-tagline">AI receptionist</p>
-  </header>
+  <!-- Left: business details -->
+  <aside class="stack">
+    <section class="panel">
+      <p class="biz-name" id="biz-name">Loading…</p>
+      <p class="biz-tag" id="biz-tagline"></p>
+      <span class="badge closed" id="open-badge"><span class="dot"></span><span id="open-text">…</span></span>
+      <ul class="facts">
+        <li><span>Hours today</span><span id="hours-today">–</span></li>
+        <li><span>Local time</span><span id="local-time">–</span></li>
+        <li><span>Phone</span><span id="phone">–</span></li>
+        <li><span>Owner</span><span id="owner">–</span></li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h2>Service area</h2>
+      <div class="chips" id="area"></div>
+    </section>
+    <section class="panel">
+      <h2>Technicians</h2>
+      <div id="techs"></div>
+    </section>
+    <div class="alert">
+      <strong>Smell gas or see sparks?</strong>
+      Leave the house first and call 911. The AI will give safety steps and alert the owner instantly.
+    </div>
+  </aside>
 
-  <div class="card">
-    <div id="chat"><div class="empty" id="empty">Press "Start call" to talk to the receptionist.</div></div>
+  <!-- Center: voice orb -->
+  <div class="col-center stack">
+    <section class="panel stage">
+      <div class="stage-top">
+        <span class="live" id="live"><span class="dot"></span><span id="live-text">Ready</span></span>
+        <span class="timer" id="timer">00:00</span>
+      </div>
+      <div class="orb-wrap">
+        <canvas id="orb" aria-label="Voice assistant. Hold to talk during a call." role="button"></canvas>
+        <div class="orb-hint" id="orb-hint">Press Start call</div>
+      </div>
+      <div class="state" id="state">Hi, I'm your AI receptionist</div>
+      <p class="substate" id="substate">I can book a technician, answer questions, and check with the owner when needed.</p>
+      <div class="controls">
+        <button class="btn-primary" id="start">Start call</button>
+        <button class="btn-ghost" id="talk" disabled>Hold to talk</button>
+        <button class="btn-danger" id="end" hidden>End call</button>
+      </div>
+      <div class="steps">
+        <span class="step" data-step="listening">Listening</span>
+        <span class="step" data-step="thinking">Thinking</span>
+        <span class="step" data-step="speaking">Speaking</span>
+        <span class="step" data-step="waiting">Checking with owner</span>
+      </div>
+      <div class="kbd">Hold the orb, the button, or <kbd>Space</kbd> while you speak · release to send</div>
+    </section>
+
+    <section class="panel">
+      <h2>Services &amp; prices</h2>
+      <div class="services" id="services"></div>
+    </section>
+
+    <section class="panel">
+      <h2>How it works</h2>
+      <div class="how">
+        <div><b>1 · AI books routine jobs</b>Repairs, tune-ups and plumbing are booked on the call, with a real technician and time.</div>
+        <div><b>2 · Owner decides big ones</b><span id="how-owner">Installs, commercial jobs and new questions go to the owner live, by phone or console.</span></div>
+        <div><b>3 · Everything lands in the CRM</b>Every call becomes a contact, lead and job in FlowCRM, instantly.</div>
+      </div>
+    </section>
   </div>
 
-  <div class="controls">
-    <button id="start">Start call</button>
-    <button id="talk" disabled>Hold to talk</button>
-    <div id="status"><span class="spinner"></span><span id="status-text"></span></div>
-    <div class="hint">Hold the button while you speak, release when you're done. Works with the space bar too.</div>
-  </div>
+  <!-- Right: live transcript -->
+  <aside class="stack">
+    <section class="panel">
+      <h2>Live transcript</h2>
+      <div class="transcript" id="chat"><div class="empty" id="empty">The conversation will appear here.</div></div>
+    </section>
+    <section class="panel">
+      <h2>Call details</h2>
+      <div class="meta">
+        <div><small>Status</small><b id="m-status">Not started</b></div>
+        <div><small>Turns</small><b id="m-turns">0</b></div>
+        <div><small>Voice</small><b id="m-voice">–</b></div>
+        <div><small>Call ID</small><b id="m-id">–</b></div>
+      </div>
+    </section>
+  </aside>
 </main>
 
-<script>
-  const chat = document.getElementById("chat");
-  const startBtn = document.getElementById("start");
-  const talkBtn = document.getElementById("talk");
-  const statusBox = document.getElementById("status");
-  const statusText = document.getElementById("status-text");
+<footer id="footer">Talkse AI receptionist · calls are recorded in the business CRM</footer>
 
-  let callId = null;
-  let stream = null;
-  let recorder = null;
-  let chunks = [];
-  let recordStart = 0;
-  let busy = false;
-  let audioEl = null;
-  let ownerName = "the owner";
+<script>
+  // ---------------------------------------------------------------- elements
+  const $ = id => document.getElementById(id);
+  const chat = $("chat"), startBtn = $("start"), talkBtn = $("talk"), endBtn = $("end"), orbCanvas = $("orb");
+
+  let callId = null, stream = null, recorder = null, chunks = [], recordStart = 0;
+  let busy = false, audioEl = null, ownerName = "the owner", turns = 0, callStarted = 0, timerId = null, canTalk = false;
 
   // Safari records audio/mp4, Chrome/Firefox audio/webm; Groq accepts both
   const MIME = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(
-    t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)
-  ) || "";
+    t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
   const EXT = MIME.includes("mp4") ? "m4a" : "webm";
 
-  function setStatus(text, { spinning = false, error = false } = {}) {
-    statusText.textContent = text;
-    statusBox.classList.toggle("busy", spinning);
-    statusBox.classList.toggle("error", error);
+  // ---------------------------------------------------------------- UI state
+  const STATES = {
+    idle:      { title: "Hi, I'm your AI receptionist", live: "Ready" },
+    connecting:{ title: "Connecting…", live: "Connecting" },
+    yourturn:  { title: "Your turn", live: "Live" },
+    listening: { title: "Listening…", live: "Live" },
+    thinking:  { title: "Thinking…", live: "Live" },
+    speaking:  { title: "Speaking", live: "Live" },
+    waiting:   { title: "Checking with the owner", live: "On hold" },
+    ended:     { title: "Call ended", live: "Ended" },
+  };
+  let uiState = "idle";
+
+  function setState(state, sub = null, { error = false } = {}) {
+    uiState = state;
+    const s = STATES[state];
+    $("state").textContent = state === "waiting" ? `Checking with ${ownerName}` : s.title;
+    if (sub !== null) $("substate").textContent = sub;
+    $("substate").classList.toggle("error", error);
+    $("live-text").textContent = s.live;
+    $("live").classList.toggle("on", ["yourturn", "listening", "thinking", "speaking", "waiting"].includes(state));
+    document.querySelectorAll(".step").forEach(el => el.classList.toggle("active", el.dataset.step === state));
+    $("orb-hint").textContent = state === "yourturn" ? "Hold to talk" : state === "idle" ? "Press Start call"
+      : state === "listening" ? "Release to send" : "";
+    orb.setMode(state);
   }
 
-  function addBubble(role, text) {
-    const empty = document.getElementById("empty");
-    if (empty) empty.remove();
+  function addMsg(role, text) {
+    $("empty")?.remove();
     const div = document.createElement("div");
-    div.className = `bubble ${role}`;
-    div.textContent = text;
+    div.className = `msg ${role}`;
+    const who = role === "caller" ? "You" : role === "assistant" ? "AI receptionist" : "";
+    div.innerHTML = who ? `<small>${who}</small>` : "";
+    div.appendChild(document.createTextNode(text));
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
   }
 
+  function setMeta(status) {
+    const labels = { collecting: "In progress", waiting_human: "On hold (owner)", done: "Completed",
+                     needs_human: "Owner will call back", emergency: "Safety alert" };
+    $("m-status").textContent = labels[status] || status;
+    $("m-turns").textContent = turns;
+  }
+
+  function startTimer() {
+    callStarted = Date.now();
+    clearInterval(timerId);
+    timerId = setInterval(() => {
+      const s = Math.floor((Date.now() - callStarted) / 1000);
+      $("timer").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    }, 500);
+  }
+
+  // ---------------------------------------------------------------- audio levels (drive the orb)
+  let audioCtx = null, micAnalyser = null, outAnalyser = null, synthSpeaking = false;
+  const levelBuf = new Uint8Array(1024);
+
+  function ensureAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  }
+  function rms(analyser) {
+    if (!analyser) return 0;
+    analyser.getByteTimeDomainData(levelBuf);
+    let sum = 0;
+    for (let i = 0; i < levelBuf.length; i++) { const v = (levelBuf[i] - 128) / 128; sum += v * v; }
+    return Math.min(1, Math.sqrt(sum / levelBuf.length) * 4);
+  }
+  function currentLevel() {
+    if (uiState === "listening") return rms(micAnalyser);
+    if (uiState === "speaking") {
+      if (synthSpeaking) return 0.35 + 0.25 * Math.abs(Math.sin(performance.now() / 120));
+      return rms(outAnalyser);
+    }
+    return 0;
+  }
+
+  // ---------------------------------------------------------------- 3D voice orb
+  const orb = (() => {
+    const ctx = orbCanvas.getContext("2d");
+    const palette = {
+      idle:      [[79, 140, 255], [34, 211, 238]],
+      connecting:[[79, 140, 255], [139, 92, 246]],
+      yourturn:  [[79, 140, 255], [34, 211, 238]],
+      listening: [[16, 185, 129], [34, 211, 238]],
+      thinking:  [[139, 92, 246], [79, 140, 255]],
+      speaking:  [[59, 130, 246], [34, 211, 238]],
+      waiting:   [[245, 158, 11], [251, 191, 36]],
+      ended:     [[100, 116, 139], [71, 85, 105]],
+    };
+    let mode = "idle", level = 0, cur = palette.idle.map(c => c.slice());
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const size = orbCanvas.clientWidth;
+      orbCanvas.width = size * dpr; orbCanvas.height = size * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+    function frame(t) {
+      const size = orbCanvas.clientWidth, cx = size / 2, cy = size / 2, base = size * 0.27;
+      const target = palette[mode] || palette.idle;
+      for (let i = 0; i < 2; i++) for (let k = 0; k < 3; k++) cur[i][k] += (target[i][k] - cur[i][k]) * 0.06;
+      level += (currentLevel() - level) * 0.25;
+
+      const time = t / 1000;
+      const speed = mode === "thinking" ? 2.6 : mode === "waiting" ? 1.2 : mode === "idle" ? 0.6 : 1.4;
+      const breathe = mode === "waiting" ? 0.04 * Math.sin(time * 3) : 0.015 * Math.sin(time * 1.6);
+      const energy = 0.05 + level * 0.32 + (mode === "thinking" ? 0.06 : 0);
+      const r = base * (1 + breathe + level * 0.18);
+      const [c1, c2] = cur;
+
+      ctx.clearRect(0, 0, size, size);
+
+      // Outer glow
+      const glow = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 2.1);
+      glow.addColorStop(0, rgba(c1, 0.35 + level * 0.3));
+      glow.addColorStop(0.5, rgba(c2, 0.08));
+      glow.addColorStop(1, rgba(c2, 0));
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, size, size);
+
+      // Orbit rings (tilted ellipses give depth)
+      for (let i = 0; i < 3; i++) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(time * speed * (0.2 + i * 0.12) * (i % 2 ? -1 : 1) + i);
+        ctx.scale(1, 0.32 + i * 0.08);
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (1.32 + i * 0.16 + level * 0.12), 0, Math.PI * 2);
+        ctx.strokeStyle = rgba(i % 2 ? c2 : c1, 0.18 - i * 0.04 + level * 0.12);
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Deformed sphere surface
+      const pts = 96;
+      ctx.beginPath();
+      for (let i = 0; i <= pts; i++) {
+        const a = (i / pts) * Math.PI * 2;
+        const wobble =
+          Math.sin(a * 3 + time * speed * 1.3) * 0.5 +
+          Math.sin(a * 5 - time * speed * 1.7) * 0.3 +
+          Math.sin(a * 2 + time * speed * 0.7) * 0.2;
+        const rr = r * (1 + wobble * energy);
+        const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.closePath();
+      const body = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.15);
+      body.addColorStop(0, "rgba(255,255,255,0.95)");
+      body.addColorStop(0.18, rgba(c2, 0.95));
+      body.addColorStop(0.62, rgba(c1, 0.92));
+      body.addColorStop(1, rgba([c1[0] * 0.25, c1[1] * 0.25, c1[2] * 0.35], 0.95));
+      ctx.fillStyle = body;
+      ctx.shadowColor = rgba(c1, 0.6);
+      ctx.shadowBlur = 40 + level * 40;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Inner flowing bands (clipped to the sphere) for a 3D, liquid look
+      ctx.save();
+      ctx.clip();
+      for (let i = 0; i < 4; i++) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(time * speed * 0.4 * (i % 2 ? 1 : -1) + i * 0.8);
+        ctx.scale(1, 0.45);
+        ctx.beginPath();
+        ctx.ellipse(r * 0.15 * Math.sin(time + i), 0, r * (0.9 - i * 0.15), r * 0.55, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,255,255,${0.10 + level * 0.15})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+      // Specular highlight and rim light
+      const spec = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.45, 0, cx - r * 0.38, cy - r * 0.45, r * 0.55);
+      spec.addColorStop(0, "rgba(255,255,255,0.55)");
+      spec.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = spec;
+      ctx.fillRect(0, 0, size, size);
+      const rim = ctx.createRadialGradient(cx, cy, r * 0.75, cx, cy, r * 1.1);
+      rim.addColorStop(0, "rgba(0,0,0,0)");
+      rim.addColorStop(1, rgba(c2, 0.35));
+      ctx.fillStyle = rim;
+      ctx.fillRect(0, 0, size, size);
+      ctx.restore();
+
+      // Thinking: orbiting dots
+      if (mode === "thinking" || mode === "connecting") {
+        for (let i = 0; i < 3; i++) {
+          const a = time * 3 + (i * Math.PI * 2) / 3;
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(a) * r * 1.35, cy + Math.sin(a) * r * 0.45, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = rgba(c2, 0.9);
+          ctx.fill();
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    return { setMode: m => { mode = m; } };
+  })();
+
+  // ---------------------------------------------------------------- playback
   // Fallback when server TTS (Deepgram) fails: the browser's built-in voice reads the text
   function speakInBrowser(text) {
     if (!text || !window.speechSynthesis) return Promise.resolve();
     speechSynthesis.cancel();
+    $("m-voice").textContent = "Browser";
     return new Promise(resolve => {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "en-US";
-      u.onend = resolve;
-      u.onerror = resolve;
+      synthSpeaking = true;
+      u.onend = u.onerror = () => { synthSpeaking = false; resolve(); };
       speechSynthesis.speak(u);
     });
   }
@@ -131,7 +509,16 @@
   function play(b64, text) {
     if (!b64) return speakInBrowser(text);
     if (audioEl) audioEl.pause();
+    $("m-voice").textContent = "Deepgram";
     audioEl = new Audio(`data:audio/mpeg;base64,${b64}`);
+    try {
+      ensureAudio();
+      const src = audioCtx.createMediaElementSource(audioEl);
+      outAnalyser = audioCtx.createAnalyser();
+      outAnalyser.fftSize = 2048;
+      src.connect(outAnalyser);
+      outAnalyser.connect(audioCtx.destination);
+    } catch (_) { outAnalyser = null; }
     return new Promise(resolve => {
       audioEl.onended = resolve;
       audioEl.onerror = resolve;
@@ -139,51 +526,65 @@
     });
   }
 
-  function endCall(status) {
-    talkBtn.disabled = true;
-    startBtn.disabled = false;
-    startBtn.textContent = "New call";
-    const labels = {
-      done: "Call complete.",
-      needs_human: "The owner will call you back.",
-      emergency: "Please follow the safety instructions. The owner has been alerted.",
-    };
-    setStatus(labels[status] || "Call ended.");
+  // ---------------------------------------------------------------- call flow
+  function allowTalk(on) {
+    canTalk = on;
+    talkBtn.disabled = !on;
   }
 
   async function startCall() {
     startBtn.disabled = true;
     chat.innerHTML = "";
-    setStatus("Connecting…", { spinning: true });
+    turns = 0;
+    setState("connecting", "Setting up your call…");
     try {
+      ensureAudio();
       // Ask for the mic first so the permission prompt appears on the user's click
       if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const res = await fetch("/api/calls", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
+      micAnalyser = audioCtx.createAnalyser();
+      micAnalyser.fftSize = 2048;
+      audioCtx.createMediaStreamSource(stream).connect(micAnalyser);
+
+      const res = await fetch("/api/calls", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       callId = data.call_id;
-      addBubble("assistant", data.reply_text);
-      setStatus("Receptionist is speaking…");
-      await play(data.audio_b64, data.reply_text);
-      talkBtn.disabled = false;
-      setStatus("Your turn: hold the button and speak.");
+      $("m-id").textContent = callId.slice(0, 8);
+      startBtn.hidden = true;
+      endBtn.hidden = false;
+      startTimer();
+      await handleReply(data);
     } catch (err) {
       startBtn.disabled = false;
       const msg = err.name === "NotAllowedError"
         ? "Microphone permission was denied. Allow it in the browser and try again."
         : `Could not start the call: ${err.message}`;
-      setStatus(msg, { error: true });
+      setState("idle", msg, { error: true });
     }
   }
 
+  function endCall(status, { byUser = false } = {}) {
+    allowTalk(false);
+    clearInterval(timerId);
+    callId = byUser ? null : callId;
+    endBtn.hidden = true;
+    startBtn.hidden = false;
+    startBtn.disabled = false;
+    startBtn.textContent = "New call";
+    const labels = {
+      done: "All set! You'll get the technician at the booked time.",
+      needs_human: `${ownerName} will call you back shortly.`,
+      emergency: `Please follow the safety steps. ${ownerName} has been alerted.`,
+    };
+    if (status) setMeta(status);
+    setState("ended", byUser ? "You ended the call." : labels[status] || "Thanks for calling.");
+  }
+
   function startRecording() {
-    if (!callId || busy || talkBtn.disabled || recorder) return;
+    if (!callId || busy || !canTalk || recorder) return;
     if (audioEl) audioEl.pause();
     if (window.speechSynthesis) speechSynthesis.cancel();
+    ensureAudio();
     chunks = [];
     recorder = new MediaRecorder(stream, MIME ? { mimeType: MIME } : undefined);
     recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
@@ -192,7 +593,7 @@
     recorder.start();
     talkBtn.classList.add("recording");
     talkBtn.textContent = "Listening…";
-    setStatus("Release when you're done.");
+    setState("listening", "Speak now, release when you're done.");
   }
 
   function stopRecording() {
@@ -205,25 +606,23 @@
   async function sendTurn() {
     recorder = null;
     if (Date.now() - recordStart < 400) {
-      setStatus("That was too short. Hold the button while you speak.");
+      setState("yourturn", "That was too short. Hold while you speak.");
       return;
     }
-    const blob = new Blob(chunks, { type: MIME || "audio/webm" });
     const form = new FormData();
-    form.append("audio", blob, `turn.${EXT}`);
-
+    form.append("audio", new Blob(chunks, { type: MIME || "audio/webm" }), `turn.${EXT}`);
     busy = true;
-    talkBtn.disabled = true;
-    setStatus("Thinking…", { spinning: true });
+    allowTalk(false);
+    setState("thinking", "Understanding your request…");
     try {
       const res = await fetch(`/api/calls/${callId}/turn`, { method: "POST", body: form });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      if (data.transcript) addBubble("caller", data.transcript);
+      if (data.transcript) { addMsg("caller", data.transcript); turns++; }
       await handleReply(data);
     } catch (err) {
-      talkBtn.disabled = false;
-      setStatus(`Something went wrong (${err.message}). Please try again.`, { error: true });
+      allowTalk(true);
+      setState("yourturn", `Something went wrong (${err.message}). Please try again.`, { error: true });
     } finally {
       busy = false;
     }
@@ -231,12 +630,14 @@
 
   // Speaks a reply, then either hands the turn back, waits for the owner, or ends the call
   async function handleReply(data) {
-    addBubble("assistant", data.reply_text);
-    setStatus("Receptionist is speaking…");
+    addMsg("assistant", data.reply_text);
+    setMeta(data.status);
+    setState("speaking", "");
     await play(data.audio_b64, data.reply_text);
+    if (!callId) return;
     if (data.status === "collecting") {
-      talkBtn.disabled = false;
-      setStatus("Your turn: hold the button and speak.");
+      allowTalk(true);
+      setState("yourturn", "Hold the orb or the button and speak.");
     } else if (data.status === "waiting_human") {
       await waitForOwner();
     } else {
@@ -246,9 +647,10 @@
 
   // The AI asked the owner: poll until the owner answers (or the server times out)
   async function waitForOwner() {
-    talkBtn.disabled = true;
-    setStatus(`Checking with ${ownerName}…`, { spinning: true });
-    while (true) {
+    allowTalk(false);
+    addMsg("system", `On hold while ${ownerName} decides…`);
+    setState("waiting", `${ownerName} gets this on their phone and the owner console.`);
+    while (callId) {
       await new Promise(r => setTimeout(r, 2000));
       try {
         const res = await fetch(`/api/calls/${callId}/status`);
@@ -260,31 +662,81 @@
     }
   }
 
+  // ---------------------------------------------------------------- input wiring
   startBtn.addEventListener("click", startCall);
+  endBtn.addEventListener("click", () => {
+    if (recorder) { recorder.onstop = null; recorder.stop(); recorder = null; }
+    if (audioEl) audioEl.pause();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    endCall(null, { byUser: true });
+  });
 
   // Pointer events cover mouse and touch; capture keeps "release" working if the finger slides off
-  talkBtn.addEventListener("pointerdown", e => { talkBtn.setPointerCapture(e.pointerId); startRecording(); });
-  talkBtn.addEventListener("pointerup", stopRecording);
-  talkBtn.addEventListener("pointercancel", stopRecording);
-  talkBtn.addEventListener("contextmenu", e => e.preventDefault());
-
+  for (const el of [talkBtn, orbCanvas]) {
+    el.addEventListener("pointerdown", e => { if (!canTalk) return; el.setPointerCapture(e.pointerId); startRecording(); });
+    el.addEventListener("pointerup", stopRecording);
+    el.addEventListener("pointercancel", stopRecording);
+    el.addEventListener("contextmenu", e => e.preventDefault());
+  }
   document.addEventListener("keydown", e => {
-    if (e.code === "Space" && !e.repeat && document.activeElement !== startBtn) { e.preventDefault(); startRecording(); }
+    if (e.code === "Space" && !e.repeat && !["BUTTON", "A"].includes(document.activeElement?.tagName)) {
+      e.preventDefault(); startRecording();
+    }
   });
-  document.addEventListener("keyup", e => {
-    if (e.code === "Space") { e.preventDefault(); stopRecording(); }
-  });
+  document.addEventListener("keyup", e => { if (e.code === "Space") { e.preventDefault(); stopRecording(); } });
+
+  // ---------------------------------------------------------------- business details
+  const money = v => v === 0 ? "Free" : v == null ? "" : `$${Number(v).toLocaleString("en-US")}`;
+  const initials = n => n.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
 
   fetch("/api/info").then(r => r.json()).then(info => {
-    document.getElementById("biz-name").textContent = info.name;
-    document.getElementById("biz-tagline").textContent = info.tagline || "AI receptionist";
-    document.title = `${info.name} · Talkse`;
-    if (info.owner) ownerName = info.owner;
+    ownerName = info.owner || ownerName;
+    document.title = `${info.name} · AI Receptionist`;
+    $("biz-header").textContent = info.name;
+    $("biz-name").textContent = info.name;
+    $("biz-tagline").textContent = info.tagline || "";
+    $("open-badge").className = `badge ${info.open_now ? "open" : "closed"}`;
+    $("open-text").textContent = info.open_now ? "Open now" : "Closed now · AI still answers";
+    $("hours-today").textContent = info.hours_today;
+    $("local-time").textContent = `${info.local_time}${info.city ? " · " + info.city : ""}`;
+    $("phone").textContent = info.phone || "–";
+    $("owner").textContent = `${info.owner} (${info.owner_title})`;
+    $("area").innerHTML = "";
+    (info.service_area || []).forEach(a => {
+      const c = document.createElement("span"); c.className = "chip"; c.textContent = a; $("area").appendChild(c);
+    });
+    $("techs").innerHTML = "";
+    (info.technicians || []).forEach(t => {
+      const d = document.createElement("div"); d.className = "tech";
+      d.innerHTML = `<span class="avatar"></span><span><span class="tname"></span><small></small></span>`;
+      d.querySelector(".avatar").textContent = initials(t.name);
+      d.querySelector(".tname").textContent = t.name;
+      d.querySelector("small").textContent = t.title;
+      $("techs").appendChild(d);
+    });
+    $("services").innerHTML = "";
+    (info.services || []).forEach(s => {
+      const d = document.createElement("div"); d.className = "svc";
+      d.innerHTML = `<div class="svc-top"><span class="svc-name"></span><span class="svc-price"></span></div><p></p>`;
+      d.querySelector(".svc-name").textContent = s.name;
+      d.querySelector(".svc-price").textContent = s.needs_approval ? `from ${money(s.price_usd)}` : money(s.price_usd);
+      d.querySelector("p").textContent = s.description;
+      if (s.needs_approval) {
+        const tag = document.createElement("span"); tag.className = "owner-tag"; tag.textContent = `★ ${info.owner} approves`;
+        d.appendChild(tag);
+      }
+      $("services").appendChild(d);
+    });
+    $("how-owner").textContent = `Installs, commercial jobs and new questions go to ${info.owner} live, on Telegram or the owner console.`;
+    $("footer").textContent = `${info.name} · AI receptionist by Talkse · every call is recorded in the CRM`;
+    if (info.crm_url) { $("crm-link").href = info.crm_url; $("crm-link").hidden = false; }
+    if (uiState === "idle") $("substate").textContent =
+      `I can book a technician, answer questions, and check with ${info.owner} when needed.`;
   }).catch(() => {});
 
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     startBtn.disabled = true;
-    setStatus("This browser can't record audio. Use Chrome, Edge, Firefox or Safari over HTTPS.", { error: true });
+    setState("idle", "This browser can't record audio. Use Chrome, Edge, Firefox or Safari over HTTPS.", { error: true });
   }
 </script>
 </body>
