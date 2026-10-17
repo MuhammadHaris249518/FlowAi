@@ -4,10 +4,12 @@
 // answer the owner's pending approval requests.
 //
 // TALKSE_MCP_URL: e.g. https://<talkse-host>/mcp/  (unset = Talkse tools disabled)
+// TALKSE_MCP_KEY: must equal Talkse's MCP_API_KEY (sent as a Bearer token)
 
 import type { AssistantToolDefinition } from "../modules/assistant/assistant.types";
 
 const MCP_URL = process.env.TALKSE_MCP_URL ?? "";
+const MCP_KEY = process.env.TALKSE_MCP_KEY ?? "";
 const PROTOCOL_VERSION = "2025-03-26";
 const TOOL_PREFIX = "talkse__";
 const TOOLS_TTL_MS = 60_000;
@@ -30,6 +32,7 @@ async function rpc(method: string, params?: Record<string, unknown>, notificatio
     "MCP-Protocol-Version": PROTOCOL_VERSION,
   };
   if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+  if (MCP_KEY) headers.Authorization = `Bearer ${MCP_KEY}`;
   const body = notification
     ? { jsonrpc: "2.0", method, params }
     : { jsonrpc: "2.0", id: ++rpcId, method, params };

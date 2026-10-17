@@ -81,16 +81,26 @@ def check_availability(service: str, preferred_time: str, area: str = "") -> dic
             "reason": reason, "needs_owner_approval": approval}
 
 
+def _booking_key(customer_name: str, service: str, preferred_time: str, area: str) -> dict:
+    """What the owner approved, so an approval can't be reused for a different job."""
+    return {k: (v or "").strip().lower() for k, v in
+            {"customer_name": customer_name, "service": service, "preferred_time": preferred_time, "area": area}.items()}
+
+
 @mcp.tool()
 def book_visit(customer_name: str, service: str, preferred_time: str, area: str, phone: str = "",
-               owner_approved: bool = False) -> dict:
+               approval_request_id: str = "") -> dict:
     """Book a technician visit and record it in the CRM (contact, lead, deal, activity).
-    Jobs that need the owner's approval are refused unless owner_approved is true."""
+    Jobs that need the owner's approval (installs, commercial, outside the service area) are NOT booked:
+    the owner gets an approval request instead. After the owner approves it (owner console, email,
+    WhatsApp), call book_visit again with the same details and approval_request_id to book it."""
+    booking = _booking_key(customer_name, service, preferred_time, area)
     state = {
         "intent": "book", "service": service, "issue": None, "area": area, "preferred_time": preferred_time,
-        "caller_name": customer_name, "caller_phone": phone or None, "existing_appointment_ref": None, "owner_approved": owner_approved,
-        "escalation": None, "turn_count": 0, "unclear_turns": 0, "status": "collecting",
+        "caller_name": customer_name, "caller_phone": phone or None, "existing_appointment_ref": None,
+        "owner_approved": False, "escalation": None, "turn_count": 0, "unclear_turns": 0, "status": "collecting",
         "idempotency_key": f"mcp_{int(time.time())}_{uuid.uuid4().hex[:6]}", "booking_result": None,
+        "channel": "mcp", "mcp_booking": booking,
     }
     # Idempotent: an LLM client may call book_visit twice for one request; return the existing booking
     existing = db.find_booking(customer_name, be.parse_time_string(preferred_time))
@@ -100,16 +110,44 @@ def book_visit(customer_name: str, service: str, preferred_time: str, area: str,
                 "message": f"Booking confirmed: {customer_name} with {tech['name'] if tech else 'a technician'} "
                            f"on {existing['scheduled_start'].astimezone(config.TZ).strftime('%A, %B %d at %I:%M %p')}."}
 
+    # Human in the loop: only the owner can approve. The approval is checked against what he approved.
+    call_id = None
+    reason = be.check_owner_approval(config.get_service(service), service, area or None)
+    if reason:
+        if not approval_request_id:
+            call = db.create_call(state, phone or None)
+            call_id = str(call["id"])
+            message = handoff.escalate(call_id, state, "approval", reason)
+            db.update_call(call_id, state, [{"role": "assistant", "text": f"Approval requested via FlowCRM assistant: {reason}"}])
+            return {"booked": False, "needs_owner_approval": True, "approval_request_id": state["escalation"]["id"],
+                    "reason": reason,
+                    "message": f"Not booked yet: {config.OWNER_NAME} must approve this job ({reason}). The request was "
+                               f"sent to him. Once he approves, call book_visit again with approval_request_id."}
+        esc = db.get_escalation(approval_request_id)
+        if not esc or esc["kind"] != "approval":
+            return {"booked": False, "reason": "Unknown approval request"}
+        if esc["status"] == "pending":
+            return {"booked": False, "needs_owner_approval": True, "reason": f"{config.OWNER_NAME} hasn't answered yet"}
+        if esc.get("answer") != "approve":
+            return {"booked": False, "reason": f"{config.OWNER_NAME} did not approve this job (answer: {esc.get('answer')})"}
+        approved_call = db.get_call(str(esc["call_id"]))
+        if not approved_call or (approved_call["state_json"] or {}).get("mcp_booking") != booking:
+            return {"booked": False, "reason": "This approval was for a different job; request a new approval"}
+        call_id = str(approved_call["id"])
+        state = approved_call["state_json"]
+        state["owner_approved"] = True
+
     result = be.book_appointment(state, state["idempotency_key"])
     if result["status"] != "confirmed":
-        return {"booked": False, "reason": result.get("reason"), "needs_owner_approval": bool(result.get("requires_human"))}
+        return {"booked": False, "reason": result.get("reason")}
 
     # Record it like a call so crm_sync writes the same CRM records a phone booking creates
     state["status"] = "done"
     state["booking_result"] = result
-    call = db.create_call(state, phone or None)
-    db.update_call(str(call["id"]), state, [{"role": "assistant", "text": f"Booked via FlowCRM assistant: {result['message']}"}])
-    crm_sync.sync_call(str(call["id"]))
+    if not call_id:
+        call_id = str(db.create_call(state, phone or None)["id"])
+    db.update_call(call_id, state, [{"role": "assistant", "text": f"Booked via FlowCRM assistant: {result['message']}"}])
+    crm_sync.sync_call(call_id)
     return {"booked": True, "message": result["message"], "technician": result["provider_name"],
             "time": result["scheduled_start"], "deposit_required": result["deposit_required"]}
 

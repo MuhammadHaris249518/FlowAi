@@ -5,6 +5,7 @@ calls are blocking, so FastAPI runs them in its thread pool.
 """
 
 import base64
+import hmac
 import json
 from html import escape as html_escape
 import logging
@@ -46,6 +47,29 @@ CACHED_PHRASES = {call_engine.GREETING}
 mcp_app = mcp_server.mcp.streamable_http_app()
 
 
+class McpKeyGuard:
+    """Requires MCP_API_KEY on /mcp (as "Authorization: Bearer <key>" or "X-MCP-Key: <key>").
+    Without it anyone with the URL could book visits and read call transcripts.
+    Unset MCP_API_KEY = open (local development only)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        expected = os.getenv("MCP_API_KEY")
+        if expected and scope["type"] == "http":
+            headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+            auth = headers.get("authorization", "")
+            given = headers.get("x-mcp-key") or (auth[7:] if auth.lower().startswith("bearer ") else "")
+            if not hmac.compare_digest(given.encode(), expected.encode()):
+                body = b'{"error":"Missing or invalid MCP key"}'
+                await send({"type": "http.response.start", "status": 401,
+                            "headers": [(b"content-type", b"application/json"), (b"www-authenticate", b"Bearer")]})
+                await send({"type": "http.response.body", "body": body})
+                return
+        await self.app(scope, receive, send)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not db.DATABASE_URL.startswith(("postgres://", "postgresql://")):
@@ -66,7 +90,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Talkse", lifespan=lifespan)
-app.mount("/mcp", mcp_app)
+app.mount("/mcp", McpKeyGuard(mcp_app))
 app.include_router(telephony.router)  # real phone calls (SignalWire cXML)
 
 
