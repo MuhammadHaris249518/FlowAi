@@ -13,6 +13,7 @@ export function useMe() {
     queryKey: ["auth", "me"],
     queryFn: () => authApi.getMe({ getToken, organizationId: null }),
     enabled: Boolean(isSignedIn),
-    retry: false,
+    // A couple of retries ride out an API that is still starting; then the gate shows an error with Retry
+    retry: 2,
   });
 }
